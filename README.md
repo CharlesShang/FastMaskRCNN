@@ -1,8 +1,9 @@
-# FastMaskRCNN
+# Fast Mask RCNN
 Mask RCNN in TensorFlow 
 
-## See you in one week.
-This repo attempts to reporduce this amazing work by Kaiming He. (Mask RCNN)[https://arxiv.org/abs/1703.06870]
+## See you in one week
+This repo attempts to reporduce this amazing work by Kaiming He.
+[Mask RCNN](https://arxiv.org/abs/1703.06870)
 
 ## Timeline
 - [x] ROIAlign
