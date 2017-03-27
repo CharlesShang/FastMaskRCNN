@@ -1,11 +1,12 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-import functools
 
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-from .roi_utils import roi_cropping
+
+from libs.boxes.roi import roi_cropping
+
 # mapping each stage to its' tensor features
 networks_map = {
   'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',

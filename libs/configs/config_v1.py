@@ -181,4 +181,32 @@ tf.app.flags.DEFINE_boolean(
     'ignore_missing_vars', False,
     'When restoring a checkpoint would ignore missing variables.')
 
+#######################
+# BOX Flags #
+#######################
+
+tf.app.flags.DEFINE_float(
+    'fg_threshold', 0.7,
+    'Only regions which intersection is larger than fg_threshold are considered to be fg')
+
+tf.app.flags.DEFINE_float(
+    'bg_threshold', 0.3,
+    'Only regions which intersection is less than bg_threshold are considered to be bg')
+
+tf.app.flags.DEFINE_integer(
+    'rois_per_image', 300,
+    'Number of rois that should be sampled to train this network')
+
+tf.app.flags.DEFINE_float(
+    'fg_roi_fraction', 0.25,
+    'Number of rois that should be sampled to train this network')
+
+tf.app.flags.DEFINE_float(
+    'fg_rpn_fraction', 0.25,
+    'Number of rois that should be sampled to train this network')
+
+tf.app.flags.DEFINE_integer(
+    'rpn_batch_size', 2000,
+    'Number of rois that should be sampled to train this network')
+
 FLAGS = tf.app.flags.FLAGS

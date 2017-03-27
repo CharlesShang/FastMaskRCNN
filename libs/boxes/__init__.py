@@ -6,7 +6,9 @@
 # --------------------------------------------------------
 from . import cython_nms
 from . import cython_bbox
-import boxes_grid
-import blob
 import nms
 import timer
+from .anchor import anchors
+from .anchor import anchors_plane
+from .roi import roi_cropping
+from .roi import roi_cropping
