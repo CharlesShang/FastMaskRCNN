@@ -110,8 +110,14 @@ ext_modules = [
         "boxes.cython_bbox",
         ["boxes/bbox.pyx"],
         extra_compile_args={'gcc': ["-Wno-cpp", "-Wno-unused-function"]},
-	include_dirs = [numpy_include]
-	),
+        include_dirs = [numpy_include]
+    ),
+    Extension(
+        "boxes.cython_anchor",
+        ["boxes/cython_anchor.pyx"],
+        extra_compile_args={'gcc': ["-Wno-cpp", "-Wno-unused-function"]},
+        include_dirs = [numpy_include]
+    ),
     Extension(
         "boxes.cython_nms",
         ["boxes/nms.pyx"],
