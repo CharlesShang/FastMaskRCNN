@@ -207,6 +207,24 @@ tf.app.flags.DEFINE_float(
 
 tf.app.flags.DEFINE_integer(
     'rpn_batch_size', 2000,
+    'Number of rpn anchors that should be sampled to train this network')
+
+##################################
+#            Mask                #
+##################################
+tf.app.flags.DEFINE_integer(
+    'mask_batch_size', 64,
+    'Number of masks that should be sampled to train this network')
+
+tf.app.flags.DEFINE_boolean(
+    'mask_allow_bg', True,
+    'Allow to add bg masks in the masking stage')
+
+tf.app.flags.DEFINE_float(
+    'mask_threshold', 0.50,
+    'Least intersection of a positive mask')
+tf.app.flags.DEFINE_integer(
+    'masks_per_image', 300,
     'Number of rois that should be sampled to train this network')
 
 FLAGS = tf.app.flags.FLAGS
