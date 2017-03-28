@@ -7,7 +7,7 @@ import tensorflow as tf
 
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
-from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv
+from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 # FLAGS = tf.app.flags.FLAGS
 
 def encode(gt_boxes, rois, num_classes):
@@ -21,8 +21,8 @@ def encode(gt_boxes, rois, num_classes):
   
   Returns
   --------
-  labels: Nx1 array in [0, num_classes]
-  rois:   Sampled rois
+  labels: Nx1 array in [0, num_classes)
+  rois:   Sampled rois of shape (N, 4)
   bbox_targets: N x (Kx4) regression targets
   bbox_inside_weights: N x (Kx4), in {0, 1} indicating which class is assigned.
   """
@@ -33,7 +33,8 @@ def encode(gt_boxes, rois, num_classes):
     np.ascontiguousarray(all_rois[:, 0:4], dtype=np.float),
     np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
   gt_assignment = overlaps.argmax(axis=1)  # R
-  max_overlaps = overlaps.max(axis=1)      # R
+  # max_overlaps = overlaps.max(axis=1)      # R
+  max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
   labels = gt_boxes[gt_assignment, 4]
 
   # sample rois as to 1:3
@@ -59,25 +60,29 @@ def encode(gt_boxes, rois, num_classes):
    
   return labels, rois, bbox_targets, bbox_inside_weights
 
-def decode(boxes, classes, rois):
+def decode(boxes, scores, rois, ih, iw):
   """Decode prediction targets into boxes and only keep only one boxes of greatest possibility for each rois
     Parameters
   ---------
   boxes: an array of shape (R, Kx4), [x1, y1, x2, y2, x1, x2, y1, y2]
-  classes: an array of shape (R, K),
+  scores: an array of shape (R, K),
   rois: an array of shape (R, 4), [x1, y1, x2, y2]
   
   Returns
   --------
   final_boxes: of shape (R x 4)
+  classes: of shape (R) in {0,1,2,3... K-1}
+  scores: of shape (R) in [0 ~ 1]
   """
   boxes = bbox_transform_inv(rois, deltas=boxes)
-  arg_class = np.argmax(classes, axis=1)
+  classes = np.argmax(scores, axis=1)
+  scores = np.max(scores, axis=1)
   final_boxes = np.zeros((boxes.shape[0], 4))
   for i in np.arange(0, boxes.shape[0]):
-    ind = arg_class[i]*4
+    ind = classes[i]*4
     final_boxes[i, 0:4] = boxes[i, ind:ind+4]
-  return final_boxes
+  final_boxes = clip_boxes(final_boxes, (ih, iw))
+  return final_boxes, classes, scores
 
 def _compute_targets(ex_rois, gt_rois, labels, num_classes):
   """
@@ -111,14 +116,12 @@ if __name__ == '__main__':
   cfg.FLAGS.fg_threshold = 0.1
   classes = np.random.randint(0, 3, (10, 1))
   boxes = np.random.randint(10, 50, (10, 2))
-  s = np.random.randint(0, 20, (10, 2))
+  s = np.random.randint(10, 20, (10, 2))
   s = boxes + s
   boxes = np.concatenate((boxes, s), axis=1)
   gt_boxes = np.hstack((boxes, classes))
-  rois = np.random.randint(10, 50, (20, 2))
-  s = np.random.randint(0, 20, (20, 2))
-  s = rois + s
-  rois = np.concatenate((rois, s), axis=1)
+  noise = np.random.randint(-3, 3, (10, 4))
+  rois = gt_boxes[:, :4] + noise
   labels, rois, bbox_targets, bbox_inside_weights = encode(gt_boxes, rois, num_classes=3)
   print (labels)
   print (bbox_inside_weights)
@@ -126,6 +129,7 @@ if __name__ == '__main__':
   ls = np.zeros((labels.shape[0], 3))
   for i in range(labels.shape[0]):
     ls[i, labels[i]] = 1
-  final_boxes = decode(bbox_targets, ls, rois)
-  print (np.hstack((final_boxes, np.expand_dims(labels, axis=1))))
-  print (gt_boxes)
+  final_boxes, classes, scores = decode(bbox_targets, ls, rois, 100, 100)
+  print('gt_boxes:\n', gt_boxes)
+  print ('final boxes:\n', np.hstack((final_boxes, np.expand_dims(classes, axis=1))).astype(np.int32))
+  # print (final_boxes.astype(np.int32))
