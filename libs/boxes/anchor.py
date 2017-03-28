@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+from libs.boxes import cython_anchor
 
 def anchors(scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16):
   """Get a set of anchors at one position """
@@ -19,34 +20,8 @@ def anchors_plane(height, width, stride = 1.0, **kwargs):
   ratios = kwargs.setdefault('ratios', [0.5, 1, 2.0])
   base = kwargs.setdefault('base', 16)
   anc = anchors(scales, ratios, base)
-  num_anchors = anc.shape[0]
-  shift_x = np.arange(0, width) * stride
-  shift_y = np.arange(0, height) * stride
-  shift_x, shift_y = np.meshgrid(shift_x, shift_y)
-  # (H x W, 4)
-  shifts = np.vstack((shift_x.ravel(), shift_y.ravel(),
-                      shift_x.ravel(), shift_y.ravel())).transpose()
-
-  A = num_anchors
-  K = shifts.shape[0]
-  # broadcast to (K, A, 4)
-  all_anchors = (anc.reshape((1, A, 4)) +
-                 shifts.reshape((1, K, 4)).transpose((1, 0, 2)))
-  all_anchors = all_anchors.reshape((K * A, 4))
-  # print (all_anchors.shape)
-
-  # only keep anchors inside the image
-  boarder = kwargs.setdefault('boarder', 0)
-  inds_inside = np.where(
-    (all_anchors[:, 0] >= -boarder) &
-    (all_anchors[:, 1] >= -boarder) &
-    (all_anchors[:, 2] < width * stride + boarder) &  # width
-    (all_anchors[:, 3] < height * stride + boarder)  # height
-  )[0]
-  # print('boarder: %d, inside; %s' % (boarder, inds_inside.shape[0]))
-  all_anchors = all_anchors[inds_inside, :]
-  
-  return all_anchors, inds_inside, K*A
+  all_anchors = cython_anchor.anchors_plane(height, width, stride, anc)
+  return all_anchors
 
 # Written by Ross Girshick and Sean Bell
 def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
@@ -136,18 +111,18 @@ if __name__ == '__main__':
 
   # all_anchors = anchors_plane(200, 250, stride=4, boarder=0)
   # num_anchors += all_anchors.shape[0]
-  
   for i in range(10):
-    all_anchors, _, _ = anchors_plane(200, 250, stride=4, boarder=0)
-    num_anchors += all_anchors.shape[0]
-    all_anchors, _, _ = anchors_plane(100, 125, stride=8, boarder=0)
-    num_anchors += all_anchors.shape[0]
-    all_anchors, _, _ = anchors_plane(50, 63, stride=16, boarder=0)
-    num_anchors += all_anchors.shape[0]
-    all_anchors, _, _ = anchors_plane(25, 32, stride=32, boarder=0)
-    num_anchors += all_anchors.shape[0]
-  print('average time: %f' % ((time.time() - t)/10))
-  print('total anchors: %d' % ((num_anchors) / 10))
+    ancs = anchors()
+    all_anchors = cython_anchor.anchors_plane(200, 250, 4, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+    all_anchors = cython_anchor.anchors_plane(100, 125, 8, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+    all_anchors = cython_anchor.anchors_plane(50, 63, 16, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+    all_anchors = cython_anchor.anchors_plane(25, 32, 32, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+  print('average time: %f' % ((time.time() - t) / 10))
+  print('anchors: %d' % (num_anchors / 10))
   print(a.shape, '\n', a)
   # from IPython import embed
   # embed()
