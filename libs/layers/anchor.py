@@ -125,6 +125,9 @@ def decode(boxes, scores, all_anchors, ih, iw):
   scores: of shape (R) in [0 ~ 1]
   """
   h, w = boxes.shape[1], boxes.shape[2]
+  if all_anchors == None:
+    stride = 2 ** int(round(np.log2((iw + 0.0) / w)))
+    all_anchors = anchors_plane(h, w, stride=stride)
   all_anchors = all_anchors.reshape((-1, 4))
   boxes = boxes.reshape((-1, 4))
   scores = scores.reshape((-1, 2))

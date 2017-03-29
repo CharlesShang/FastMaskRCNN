@@ -51,7 +51,7 @@ def encode(gt_masks, gt_boxes, rois, num_classes, pooled_width, pooled_height):
   gt_assignment = gt_assignment[inds]
 
   mask_targets = np.zeros((num_masks, pooled_height, pooled_width, num_classes), dtype=np.int32)
-  mask_inside_weights = np.zeros((num_masks, pooled_height, pooled_width, num_classes), dtype=np.int32)
+  mask_inside_weights = np.zeros((num_masks, pooled_height, pooled_width, num_classes), dtype=np.float32)
   
   for i in np.arange(num_masks):
     roi = rois[i, :4]
