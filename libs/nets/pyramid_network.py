@@ -32,12 +32,12 @@ _networks_map = {
 def _extra_conv_arg_scope(weight_decay=0.00005, activation_fn=None, normalizer_fn=None):
 
   with slim.arg_scope(
-      [slim.conv2d, slim.conv2d_transpose],
+      [slim.conv2d, slim.conv2d_transpose, slim.fully_connected],
       padding='SAME',
       weights_regularizer=slim.l2_regularizer(weight_decay),
       weights_initializer=slim.variance_scaling_initializer(),
-      activation_fn=None,
-      normalizer_fn=None,) as arg_sc:
+      activation_fn=activation_fn,
+      normalizer_fn=normalizer_fn,) as arg_sc:
         return arg_sc
 
 def build_pyramid(name, end_points, bilinear=True):
@@ -71,7 +71,7 @@ def build_pyramid(name, end_points, bilinear=True):
       
       return pyramid
   
-def build_head(pyramid, num_classes, num_anchors):
+def build_head(pyramid, num_classes, num_anchors, is_training=False):
   """Build the 3-way outputs, i.e., class, box and mask in the pyramid
   Algo
   ----
@@ -83,6 +83,8 @@ def build_head(pyramid, num_classes, num_anchors):
     5. Build the mask layer
     6. Build losses
   """
+  ih = 600
+  iw = 600
   outputs = {}
   arg_scope = _extra_conv_arg_scope(activation_fn=None)
   
@@ -97,20 +99,37 @@ def build_head(pyramid, num_classes, num_anchors):
       box = slim.conv2d(rpn, num_classes * num_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box'%p)
       cls = slim.conv2d(rpn, num_classes * num_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls'%p)
       outputs[p]['rpn'] = {'box': box, 'class': cls}
-      # sample and crop
+      
+      # decode, sample and crop
       rois, classes, scores = \
-                anchor_decoder(box, cls, all_anchors=None, ih=224, iw=224)
+                anchor_decoder(box, cls, None, ih, iw)
       rois, class_ids, scores = sample_rpn_outputs(rois, scores)
       cropped = ROIAlign(pyramid[p], rois, None, stride=2**i,
                          pooled_height=7, pooled_width=7,)
       
       # refine head
+      refine = slim.fully_connected(cropped, 1024, activation_fn=tf.nn.relu)
+      refine = slim.dropout(refine, keep_prob=0.75, is_training=is_training)
+      refine = slim.fully_connected(refine,  1024, activation_fn=tf.nn.relu)
+      refine = slim.dropout(refine, keep_prob=0.75, is_training=is_training)
+      cls = slim.fully_connected(refine, num_classes, activation_fn=None)
+      box = slim.fully_connected(refine, num_classes*4, activation_fn=None)
+      outputs[p]['refine'] = {'box': box, 'class': cls}
       
+      # decode refine net outputs
+      final_boxes, classes, scores = \
+              roi_decoder(box, cls, rois, ih, iw)
       
-      roi_cropping(pyramid[p], box, cls, anchors, spatial_scale=1.0/(2**i))
-      # roi align and convs
-      outputs[p]['refine'] = {'box': '', 'class': ''}
+      # mask head
+      # rois, class_ids, scores = sample_rpn_outputs(rois, scores)
+      m = ROIAlign(pyramid[p], rois, None, stride=2 ** i,
+                   pooled_height=14, pooled_width=14)
+      for i in range(4):
+        m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu)
+      m = slim.conv2d_transpose(m, 256, [2, 2], stride=2, padding='VALID', activation_fn=tf.nn.relu)
+      m = slim.conv2d(m, 81, [1, 1], stride=1, padding='VALID', activation_fn=None)
+      
       # add a mask, given the predicted boxes and classes
-      outputs[p]['mask'] = {'mask':''}
+      outputs[p]['mask'] = {'mask':m}
       
   return outputs
