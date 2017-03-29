@@ -17,7 +17,6 @@ def crop(images, boxes, batch_inds = False, stride = 1, pooled_height = 7, poole
     boxes = tf.concat([y, x], axis=1)
     boxes = tf.reshape(boxes, [-1, 4])  # to (y1, x1, y2, x2)
     
-    
     if batch_inds is False:
       shape = tf.shape(boxes)
       batch_inds = tf.zeros((shape[0], 1), dtype=tf.int32, name='batch_inds')
