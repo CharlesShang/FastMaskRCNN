@@ -61,7 +61,7 @@ def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):
   with tf.name_scope(scope) as sc:
     final_boxes, classes, scores = \
       tf.py_func(roi.decode,
-                 [boxes, scores, rois],
+                 [boxes, scores, rois, ih, iw],
                  [tf.float32, tf.int32, tf.float32])
     final_boxes = tf.convert_to_tensor(final_boxes, name='boxes')
     classes = tf.convert_to_tensor(classes, name='classes')
