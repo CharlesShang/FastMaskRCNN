@@ -11,20 +11,23 @@ from . import anchor
 from . import roi
 from . import mask
 from . import sample
+from libs.boxes.anchor import anchors_plane
 
 def anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEncoder'):
   
   with tf.name_scope(scope) as sc:
-    labels, rois, bbox_targets, bbox_inside_weights = \
+    labels, bbox_targets, bbox_inside_weights = \
       tf.py_func(anchor.encode,
                  [gt_boxes, all_anchors, height, width, stride],
                  [tf.float32, tf.float32, tf.float32, tf.float32])
     labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='labels')
-    rois = tf.convert_to_tensor(rois, name='rois')
     bbox_targets = tf.convert_to_tensor(bbox_targets, name='bbox_targets')
     bbox_inside_weights = tf.convert_to_tensor(bbox_inside_weights, name='bbox_inside_weights')
+    labels = tf.reshape(labels, (1, height, width, -1))
+    bbox_targets = tf.reshape(bbox_targets, (1, height, width, -1))
+    bbox_inside_weights = tf.reshape(bbox_inside_weights, (1, height, width, -1))
   
-  return labels, rois, bbox_targets, bbox_inside_weights
+  return labels, bbox_targets, bbox_inside_weights
 
 
 def anchor_decoder(boxes, scores, all_anchors, ih, iw, scope='AnchorDecoder'):
@@ -37,6 +40,7 @@ def anchor_decoder(boxes, scores, all_anchors, ih, iw, scope='AnchorDecoder'):
     final_boxes = tf.convert_to_tensor(final_boxes, name='boxes')
     classes = tf.convert_to_tensor(classes, name='classes')
     scores = tf.convert_to_tensor(scores, name='scores')
+    final_boxes = tf.reshape(final_boxes, (-1, 4))
   
   return final_boxes, classes, scores
 
@@ -52,6 +56,9 @@ def roi_encoder(gt_boxes, rois, num_classes, scope='ROIEncoder'):
     rois = tf.convert_to_tensor(rois, name='rois')
     bbox_targets = tf.convert_to_tensor(bbox_targets, name='bbox_targets')
     bbox_inside_weights = tf.convert_to_tensor(bbox_inside_weights, name='bbox_inside_weights')
+    rois = tf.reshape(rois, (-1, 4))
+    bbox_targets = tf.reshape(bbox_targets, (-1, num_classes * 4))
+    bbox_inside_weights = tf.reshape(bbox_inside_weights, (-1, num_classes * 4))
   
   return labels, rois, bbox_targets, bbox_inside_weights
 
@@ -66,6 +73,7 @@ def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):
     final_boxes = tf.convert_to_tensor(final_boxes, name='boxes')
     classes = tf.convert_to_tensor(classes, name='classes')
     scores = tf.convert_to_tensor(scores, name='scores')
+    final_boxes = tf.reshape(final_boxes, (-1, 4))
     
   return final_boxes, classes, scores
 
@@ -80,6 +88,9 @@ def mask_encoder(gt_masks, gt_boxes, rois, num_classes, pooled_width, pooled_hei
     rois = tf.convert_to_tensor(rois, name='rois')
     mask_targets = tf.convert_to_tensor(mask_targets, name='mask_targets')
     mask_inside_weights = tf.convert_to_tensor(mask_inside_weights, name='mask_inside_weights')
+    rois = tf.reshape(rois, (-1, 4))
+    mask_targets = tf.reshape(mask_targets, (-1, pooled_height, pooled_width, num_classes))
+    mask_inside_weights = tf.reshape(mask_inside_weights, (-1, pooled_height, pooled_width, num_classes))
   
   return rois, classes, mask_targets, mask_inside_weights
 
@@ -91,19 +102,35 @@ def mask_decoder(mask_targets, rois, classes, ih, iw, scope='MaskDecoder'):
                  [mask_targets, rois, classes, ih, iw,],
                  [tf.float32])
     final_boxes = tf.convert_to_tensor(Mask, name='MaskImage')
+    final_boxes = tf.reshape(final_boxes, (-1, 4))
   
   return Mask
 
 
-def sample_wrapper(boxes, scores, PHASE = 'TEST', scope='SampleBoxes'):
+def sample_wrapper(boxes, scores, is_training=False, scope='SampleBoxes'):
   
   with tf.name_scope(scope) as sc:
     boxes, class_ids, scores = \
       tf.py_func(sample.sample_rpn_outputs,
-                 [boxes, scores, PHASE],
+                 [boxes, scores, is_training],
                  [tf.float32, tf.int32, tf.float32])
     boxes = tf.convert_to_tensor(boxes, name='Boxes')
     class_ids = tf.convert_to_tensor(tf.cast(class_ids, tf.int32), name='Ids')
     scores = tf.convert_to_tensor(scores, name='Scores')
+    boxes = tf.reshape(boxes, (-1, 4))
   
   return boxes, class_ids, scores
+
+def gen_all_anchors(height, width, stride, scope='GenAnchors'):
+  
+  with tf.name_scope(scope) as sc:
+    all_anchors = \
+      tf.py_func(anchors_plane,
+                 [height, width, stride],
+                 [tf.float32]
+                 )
+    all_anchors = tf.convert_to_tensor(all_anchors, name='AllAnchors')
+    all_anchors = tf.reshape(all_anchors, (height, width, -1))
+    
+    return all_anchors
+    

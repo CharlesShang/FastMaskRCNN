@@ -194,7 +194,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
-    'rois_per_image', 64,
+    'rois_per_image', 128,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
@@ -218,7 +218,7 @@ tf.app.flags.DEFINE_integer(
     'Number of rpn anchors that should be sampled before nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_top_n', 500,
+    'post_nms_top_n', 128,
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_float(
@@ -228,9 +228,6 @@ tf.app.flags.DEFINE_float(
 ##################################
 #            Mask                #
 ##################################
-tf.app.flags.DEFINE_integer(
-    'mask_batch_size', 64,
-    'Number of masks that should be sampled to train this network')
 
 tf.app.flags.DEFINE_boolean(
     'mask_allow_bg', True,

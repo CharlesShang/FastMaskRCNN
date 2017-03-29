@@ -26,7 +26,7 @@ def encode(gt_masks, gt_boxes, rois, num_classes, pooled_width, pooled_height):
   rois: boxes sampled for cropping masks, of shape (M, 4)
   labels: class-ids of shape (M, 1)
   mask_targets: learning targets of shape (M, pooled_height, pooled_width, K) in {0, 1} values
-  mask_inside_weights: of shape (M) in {0, 1} indicating which mask is sampled
+  mask_inside_weights: of shape (M, pooled_height, pooled_width, K) in {0, 1} indicating which mask is sampled
   """
 
   # B x G
