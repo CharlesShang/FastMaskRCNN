@@ -194,7 +194,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
-    'rois_per_image', 300,
+    'rois_per_image', 64,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
@@ -206,8 +206,24 @@ tf.app.flags.DEFINE_float(
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
-    'rpn_batch_size', 2000,
+    'rpn_batch_size', 500,
     'Number of rpn anchors that should be sampled to train this network')
+
+##################################
+#            NMS                #
+##################################
+
+tf.app.flags.DEFINE_integer(
+    'pre_nms_top_n', 3000,
+    'Number of rpn anchors that should be sampled before nms')
+
+tf.app.flags.DEFINE_integer(
+    'post_nms_top_n', 500,
+    'Number of rpn anchors that should be sampled after nms')
+
+tf.app.flags.DEFINE_float(
+    'rpn_nms_threshold', 0.7,
+    'NMS threshold')
 
 ##################################
 #            Mask                #
@@ -226,5 +242,9 @@ tf.app.flags.DEFINE_float(
 tf.app.flags.DEFINE_integer(
     'masks_per_image', 300,
     'Number of rois that should be sampled to train this network')
+
+tf.app.flags.DEFINE_float(
+    'min_size', 16,
+    'minimum size of an object')
 
 FLAGS = tf.app.flags.FLAGS
