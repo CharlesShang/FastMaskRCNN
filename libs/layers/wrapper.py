@@ -19,7 +19,7 @@ def anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEn
     labels, bbox_targets, bbox_inside_weights = \
       tf.py_func(anchor.encode,
                  [gt_boxes, all_anchors, height, width, stride],
-                 [tf.float32, tf.float32, tf.float32, tf.float32])
+                 [tf.float32, tf.float32, tf.float32])
     labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='labels')
     bbox_targets = tf.convert_to_tensor(bbox_targets, name='bbox_targets')
     bbox_inside_weights = tf.convert_to_tensor(bbox_inside_weights, name='bbox_inside_weights')
