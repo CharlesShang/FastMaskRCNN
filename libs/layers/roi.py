@@ -28,6 +28,7 @@ def encode(gt_boxes, rois, num_classes):
   """
   
   all_rois = rois
+  num_rois = rois.shape[0]
   # R x G matrix
   overlaps = cython_bbox.bbox_overlaps(
     np.ascontiguousarray(all_rois[:, 0:4], dtype=np.float),
@@ -46,17 +47,17 @@ def encode(gt_boxes, rois, num_classes):
   
   bg_rois = cfg.FLAGS.rois_per_image - fg_rois
   bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
+  labels[bg_inds] = 0
   # print(bg_rois)
   if bg_inds.size > 0 and bg_rois < bg_inds.size:
     bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
   keep_inds = np.append(fg_inds, bg_inds)
-  labels = labels[keep_inds]
-  labels[fg_rois:] = 0
-  rois = all_rois[keep_inds]
 
   bbox_targets, bbox_inside_weights = _compute_targets(
-    rois[:, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels, num_classes)
+    rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels, num_classes)
+  bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
+  bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
    
   return labels, rois, bbox_targets, bbox_inside_weights
 
@@ -111,6 +112,19 @@ def _compute_targets(ex_rois, gt_rois, labels, num_classes):
     bbox_targets[ind, start:end] = targets[ind, 0:4]
     bbox_inside_weights[ind, start:end] = 1
   return bbox_targets, bbox_inside_weights
+
+def _unmap(data, count, inds, fill=0):
+  """ Unmap a subset of item (data) back to the original set of items (of
+  size count) """
+  if len(data.shape) == 1:
+    ret = np.empty((count,), dtype=np.float32)
+    ret.fill(fill)
+    ret[inds] = data
+  else:
+    ret = np.empty((count,) + data.shape[1:], dtype=np.float32)
+    ret.fill(fill)
+    ret[inds, :] = data
+  return ret
 
 if __name__ == '__main__':
   cfg.FLAGS.fg_threshold = 0.1
