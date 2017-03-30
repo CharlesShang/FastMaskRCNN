@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
 
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
@@ -34,13 +33,13 @@ def encode(gt_boxes, all_anchors, height, width, stride):
     all_anchors = anchors_plane(height, width, stride=stride)
 
   # anchors, inds_inside, total_anchors
+  border = cfg.FLAGS.allow_border
   all_anchors = all_anchors.reshape((-1, 4))
   inds_inside = np.where(
-    (all_anchors[:, 0] >= 0) &
-    (all_anchors[:, 1] >= 0) &
-    (all_anchors[:, 2] < width * stride) &
-    (all_anchors[:, 3] < height * stride)
-  )[0]
+    (all_anchors[:, 0] >= -border) &
+    (all_anchors[:, 1] >= -border) &
+    (all_anchors[:, 2] < (width * stride) + border) &
+    (all_anchors[:, 3] < (height * stride) + border))[0]
   anchors = all_anchors[inds_inside, :]
   total_anchors = all_anchors.shape[0]
   

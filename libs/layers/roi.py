@@ -3,7 +3,6 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import tensorflow as tf
 
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
@@ -22,7 +21,7 @@ def encode(gt_boxes, rois, num_classes):
   Returns
   --------
   labels: Nx1 array in [0, num_classes)
-  rois:   Sampled rois of shape (N, 4)
+  # rois:   Sampled rois of shape (N, 4)
   bbox_targets: N x (Kx4) regression targets
   bbox_inside_weights: N x (Kx4), in {0, 1} indicating which class is assigned.
   """
@@ -59,7 +58,7 @@ def encode(gt_boxes, rois, num_classes):
   bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
   bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
    
-  return labels, rois, bbox_targets, bbox_inside_weights
+  return labels, bbox_targets, bbox_inside_weights
 
 def decode(boxes, scores, rois, ih, iw):
   """Decode prediction targets into boxes and only keep only one boxes of greatest possibility for each rois
