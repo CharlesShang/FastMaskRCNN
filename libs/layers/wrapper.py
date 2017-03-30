@@ -61,7 +61,7 @@ def roi_encoder(gt_boxes, rois, num_classes, scope='ROIEncoder'):
     bbox_targets = tf.reshape(bbox_targets, (-1, num_classes * 4))
     bbox_inside_weights = tf.reshape(bbox_inside_weights, (-1, num_classes * 4))
   
-  return labels, rois, bbox_targets, bbox_inside_weights
+  return labels, bbox_targets, bbox_inside_weights
 
 
 def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):

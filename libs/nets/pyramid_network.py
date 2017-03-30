@@ -129,6 +129,9 @@ def build_heads(pyramid, num_classes, base_anchors, is_training=False):
       rois, class_ids, scores = sample_rpn_outputs(rois, scores)
       cropped = ROIAlign(pyramid[p], rois, False, stride=2**i,
                          pooled_height=7, pooled_width=7,)
+
+      # rois of an image, sampled from rpn output
+      outputs[p]['roi'] = {'box': rois, 'scores': scores, 'cropped': cropped}
       
       # refine head
       refine = slim.fully_connected(cropped, 1024, activation_fn=tf.nn.relu)
@@ -151,6 +154,7 @@ def build_heads(pyramid, num_classes, base_anchors, is_training=False):
       # rois, class_ids, scores = sample_rpn_outputs(rois, scores)
       m = ROIAlign(pyramid[p], rois, False, stride=2 ** i,
                    pooled_height=14, pooled_width=14)
+      outputs[p]['roi']['cropped_mask'] = m
       for i in range(4):
         m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu)
       m = slim.conv2d_transpose(m, 256, [2, 2], stride=2, padding='VALID', activation_fn=tf.nn.relu)
@@ -203,10 +207,12 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
     ### refined loss
     # 1. encode ground truth
     # 2. compute distances
+    rois = outputs[p]['roi']['box']
+    
     boxes = outputs[p]['refined']['box']
     classes = outputs[p]['refined']['cls']
-    labels, rois, bbox_targets, bbox_inside_weights = \
-      roi_encoder(gt_boxes, boxes, num_classes, scope='ROIEncoder')
+    labels, bbox_targets, bbox_inside_weights = \
+      roi_encoder(gt_boxes, rois, num_classes, scope='ROIEncoder')
     refined_box_loss = bbox_inside_weights * _smooth_l1_dist(boxes, bbox_targets)
     refined_box_loss = tf.reshape(refined_box_loss, [-1, 4])
     refined_box_loss = tf.reduce_sum(refined_box_loss, axis=1)
@@ -217,9 +223,8 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
 
     ### mask loss
     # {'mask': m, 'classes': classes, 'scores': scores}
-    # TODO: re-sample in encoder? or outside?
     masks = outputs[p]['mask']['mask']
-    rois, labels, mask_targets, mask_inside_weights = \
+    labels, mask_targets, mask_inside_weights = \
       mask_encoder(gt_masks, gt_boxes, rois, num_classes, 28, 28, scope='MaskEncoder')
     
     
