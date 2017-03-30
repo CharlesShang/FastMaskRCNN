@@ -209,6 +209,10 @@ tf.app.flags.DEFINE_integer(
     'rpn_batch_size', 500,
     'Number of rpn anchors that should be sampled to train this network')
 
+tf.app.flags.DEFINE_integer(
+    'allow_border', 0,
+    'How many pixels out of an image')
+
 ##################################
 #            NMS                #
 ##################################
