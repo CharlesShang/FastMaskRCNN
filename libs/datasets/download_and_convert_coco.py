@@ -15,6 +15,7 @@ from matplotlib import pyplot as plt
 
 from libs.datasets.pycocotools.coco import COCO
 from tensorflow.python.lib.io.tf_record import TFRecordCompressionType
+from libs.logs.log import LOG
 
 # The URL where the coco data can be downloaded.
 
@@ -145,30 +146,26 @@ def _to_tfexample(image_data, image_format, label_data, label_format, height, wi
       'label/width': _int64_feature(width),
   }))
 
-def _to_tfexample_v2(image_data, image_format, label_data, label_format, height, width,
-                     num_instances, classes, bboxes, masks):
-  """Encode category, bounding boxes and masks
-   bboxes is mx4 numpy array (bboxes.tostring())
-   segmentations is mx(rle) numpy array (masks.tostring())
-   classes is mx1 numpy array (classes.tostring())
-  """
+def _to_tfexample_coco(image_data, image_format, label_data, label_format,
+                       height, width,
+                       num_instances, gt_boxes, masks):
+  
   return tf.train.Example(features=tf.train.Features(feature={
       'image/encoded': _bytes_feature(image_data),
       'image/format': _bytes_feature(image_format),
       'image/height': _int64_feature(height),
       'image/width': _int64_feature(width),
   
-      'label/instances': _int64_feature(num_instances),
-      'label/classes': _int64_feature(classes),
-      'label/bboxes': _bytes_feature(bboxes),
-      'label/masks': _bytes_feature(masks),
+      'label/num_instances': _int64_feature(num_instances), # N
+      'label/gt_boxes': _bytes_feature(gt_boxes), # of shape (N, 5), (x1, y1, x2, y2, classid)
+      'label/gt_masks': _bytes_feature(masks),       # of shape (N, height, width)
     
       'label/encoded': _bytes_feature(label_data),  # deprecated, this is used for pixel-level segmentation
       'label/format': _bytes_feature(label_format),
   }))
 
 
-def _get_coco_masks(coco, img_id, height, width):
+def _get_coco_masks(coco, img_id, height, width, img_name):
   """ get the masks for all the instances
   Note: some images are not annotated
   Return:
@@ -193,29 +190,25 @@ def _get_coco_masks(coco, img_id, height, width):
     bboxes.append(ann['bbox'])
     m = m.astype(np.float32) * cat_id
     mask[m > 0] = m[m > 0]
-    
-    ## store seg is not possible, since an instance may contains more than one segs(parts)
-    # segm = ann['segmentation']
-    # if len(segm) == 1 and len(segm[0]) > 1:
-    #   segmentations.append(segm[0])
-    # else:
-    #   print ('Unhandled segmentation %s' % img_id)
-    #   raise
-    
-    ## rle is compressed string, can we store an array of string in TFRecord?
-    # rle = coco.annToRLE(ann)
-    # assert rle['size'][0] == m.shape[0] and rle['size'][1] == m.shape[1]
-    # rle = rle['counts']
-    
-    ## store mask only in bbox? (need it's shape info)
-    
-  
+
   masks = np.asarray(masks)
   classes = np.asarray(classes)
   bboxes = np.asarray(bboxes)
+  # to x1, y1, x2, y2
+  if bboxes.shape[0] <= 0:
+    bboxes = np.zeros([0, 4], dtype=np.float32)
+    classes = np.zeros([0], dtype=np.float32)
+    print ('None Annotations %s' % img_name)
+    LOG('None Annotations %s' % img_name)
+  bboxes[:, 2] = bboxes[:, 0] + bboxes[:, 2]
+  bboxes[:, 3] = bboxes[:, 1] + bboxes[:, 3]
+  gt_boxes = np.hstack((bboxes, classes[:, np.newaxis]))
+  gt_boxes = gt_boxes.astype(np.float32)
+  masks = masks.astype(np.int32)
+  mask = mask.astype(np.uint8)
+  assert masks.shape[0] == gt_boxes.shape[0], 'Shape Error'
   
-  return classes.astype(np.int32), bboxes.astype(np.float32), masks.astype(np.uint8), \
-         mask.astype(np.uint8)
+  return gt_boxes, masks, mask
   
 
 
@@ -275,9 +268,7 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
             
             # process anns
             h, w = imgs[i][1]['height'], imgs[i][1]['width']
-            classes, bboxes, masks, mask = _get_coco_masks(coco, img_id, h, w)
-            assert classes.shape[0] == bboxes.shape[0] == masks.shape[0], \
-              'Check number of instances for %s' % (img_name)
+            gt_boxes, masks, mask = _get_coco_masks(coco, img_id, h, w, img_name)
             # this encode matrix to png format string buff
             label_data = sess.run(encoded_image,
                                   feed_dict={mask_placeholder: np.expand_dims(mask, axis=2)})
@@ -288,11 +279,11 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
             height, width, depth = image_reader.read_jpeg_dims(sess, image_data)
             
             # to tf-record
-            example = _to_tfexample_v2(
+            example = _to_tfexample_coco(
               image_data, 'jpg',
               label_data, 'png',
-              height, width, classes.shape[0],
-              classes.tolist(), bboxes.tostring(), masks.tostring())
+              height, width, gt_boxes.shape[0],
+              gt_boxes.tostring(), masks.tostring())
             tfrecord_writer.write(example.SerializeToString())
   sys.stdout.write('\n')
   sys.stdout.flush()

@@ -146,7 +146,7 @@ tf.app.flags.DEFINE_string(
     'as `None`, then the model_name flag is used.')
 
 tf.app.flags.DEFINE_integer(
-    'batch_size', 32,
+    'batch_size', 1,
     'The number of samples in each batch.')
 
 tf.app.flags.DEFINE_integer(
