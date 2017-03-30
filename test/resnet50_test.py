@@ -16,21 +16,7 @@ resnet50 = resnet_v1.resnet_v1_50
 FLAGS = tf.app.flags.FLAGS
 
 with tf.Graph().as_default():
-  dataset = dataset_factory.get_dataset(
-    FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir)
 
-  num_classes = dataset.num_classes
-
-  provider = slim.dataset_data_provider.DatasetDataProvider(
-    dataset,
-    num_readers=FLAGS.num_readers,
-    common_queue_capacity=5,
-    common_queue_min=5)
-  [image, label, gt_masks, gt_boxes, ih, iw] = provider.get(['image', 'label',
-                                                             'gt_masks', 'gt_boxes',
-                                                             'height', 'width'])
-  
-  
   images = tf.placeholder(tf.float32, [1, 224, 224, 3], name='image')
   logits, end_points = resnet50(images, 1000, is_training=False)
   end_points['inputs'] = images

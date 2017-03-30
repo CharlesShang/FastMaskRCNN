@@ -42,14 +42,31 @@ with tf.Graph().as_default():
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(coord=coord)
-    image = image.eval()
-    ih = ih.eval()
-    iw = iw.eval()
-    num_instances = num_instances.eval()
-    # print (image)
-    print (ih, iw, num_instances)
-    gt_masks = gt_masks.eval()
-    gt_boxes = gt_boxes.eval()
-    print(gt_boxes)
-    
-    
+    for i in xrange(3):
+      npimage = image.eval()
+      npih = ih.eval()
+      npiw = iw.eval()
+      npnum_instances = num_instances.eval()
+      npgt_masks = gt_masks.eval()
+      npgt_boxes = gt_boxes.eval()
+
+      print(npgt_boxes)
+      print(npih, npiw, npnum_instances)
+
+    # dataset = dataset_factory.get_dataset(
+    #   FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir)
+    # num_classes = dataset.num_classes
+    # provider = slim.dataset_data_provider.DatasetDataProvider(
+    #     dataset,
+    #     num_readers=1,
+    #     common_queue_capacity=1,
+    #     common_queue_min=0)
+    # [image, label, gt_masks, gt_boxes, ih, iw] = \
+    #   provider.get(['image', 'label',
+    #                'gt_masks', 'gt_boxes',
+    #                'height', 'width'])
+    # npimage = image.eval()
+    print (npimage)
+
+  coord.request_stop()
+  coord.join(threads)
