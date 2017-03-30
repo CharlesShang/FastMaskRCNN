@@ -82,7 +82,7 @@ def mask_encoder(gt_masks, gt_boxes, rois, num_classes, pooled_width, pooled_hei
   with tf.name_scope(scope) as sc:
     rois, classes, mask_targets, mask_inside_weights = \
       tf.py_func(mask.encode,
-                 [gt_boxes, rois, num_classes],
+                 [gt_masks, gt_boxes, rois, num_classes, pooled_width, pooled_height],
                  [tf.float32, tf.int32, tf.int32, tf.float32])
     classes = tf.convert_to_tensor(classes, name='classes')
     rois = tf.convert_to_tensor(rois, name='rois')

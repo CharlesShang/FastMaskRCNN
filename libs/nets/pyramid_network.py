@@ -47,6 +47,19 @@ def _extra_conv_arg_scope(weight_decay=0.00005, activation_fn=None, normalizer_f
           normalizer_fn=normalizer_fn) as arg_sc:
         return arg_sc
 
+def _smooth_l1_dist(x, y, sigma2=9.0, name='smooth_l1_dist'):
+  """Smooth L1 loss
+  Returns
+  ------
+  dist: element-wise distance, as the same shape of x, y
+  """
+  deltas = x - y
+  with tf.name_scope(name=name) as scope:
+    deltas_abs = tf.abs(deltas)
+    smoothL1_sign = tf.cast(tf.less(deltas_abs, 1.0 / sigma2), tf.float32)
+    return tf.square(deltas) * 0.5 * sigma2 * smoothL1_sign + \
+           (deltas_abs - 0.5 / sigma2) * tf.abs(smoothL1_sign - 1)
+
 def build_pyramid(net_name, end_points, bilinear=True):
   """build pyramid features from a typical network,
   assume each stage is 2 time larger than its top feature
@@ -78,7 +91,7 @@ def build_pyramid(net_name, end_points, bilinear=True):
       
       return pyramid
   
-def build_head(pyramid, num_classes, base_anchors, is_training=False):
+def build_heads(pyramid, num_classes, base_anchors, is_training=False):
   """Build the 3-way outputs, i.e., class, box and mask in the pyramid
   Algo
   ----
@@ -91,8 +104,8 @@ def build_head(pyramid, num_classes, base_anchors, is_training=False):
     6. Build losses
   """
   outputs = {}
-  inshape = pyramid['inputs'].get_shape()
-  ih, iw = inshape[1].value, inshape[2].value
+  inshape = tf.shape(pyramid['inputs'])
+  ih, iw = inshape[1], inshape[2]
   arg_scope = _extra_conv_arg_scope(activation_fn=None)
   with slim.arg_scope(arg_scope):
     # for p in pyramid:
@@ -102,7 +115,8 @@ def build_head(pyramid, num_classes, base_anchors, is_training=False):
       outputs[p] = {}
       
       # rpn head
-      height, width = pyramid[p].get_shape()[1].value, pyramid[p].get_shape()[1].value
+      shape = tf.shape(pyramid[p])
+      height, width = shape[1], shape[2]
       rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='%s/rpn'%p)
       box = slim.conv2d(rpn, num_classes * base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p)
       cls = slim.conv2d(rpn, num_classes * base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p)
@@ -146,3 +160,67 @@ def build_head(pyramid, num_classes, base_anchors, is_training=False):
       outputs[p]['mask'] = {'mask':m, 'classes': classes, 'scores': scores}
       
   return outputs
+
+def build_losses(pyramid, outputs, gt_boxes, gt_masks,
+                 num_classes,
+                 rpn_box_lw =1.0, rpn_cls_lw = 1.0,
+                 refined_box_lw=1.0, refined_cls_lw=1.0,
+                 mask_lw=1.0):
+  """Building 3-way output losses, totally 5 losses
+  Params:
+  ------
+  outputs: output of build_heads
+  gt_boxes: A tensor of shape (G, 5), [x1, y1, x2, y2, class]
+  gt_masks: A tensor of shape (G, ih, iw),  {0, 1}
+  *_lw: loss weight of rpn, refined and mask losses
+  
+  Returns:
+  -------
+  l: a loss tensor
+  """
+  for i in range(5, 1, -1):
+    p = 'P%d' % i
+    stride = 2 ** i
+    shape = tf.shape(pyramid[p])
+    height, width = shape[1], shape[2]
+    
+    ### rpn losses
+    # 1. encode ground truth
+    # 2. compute distances
+    all_anchors = gen_all_anchors(height, width, stride)
+    labels, bbox_targets, bbox_inside_weights = \
+      anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEncoder')
+    boxes = outputs[p]['rpn']['box']
+    classes = outputs[p]['rpn']['cls']
+    rpn_box_loss = bbox_inside_weights * _smooth_l1_dist(boxes, bbox_targets)
+    rpn_box_loss = tf.reshape(rpn_box_loss, [-1, 4])
+    rpn_box_loss = tf.reduce_sum(rpn_box_loss, axis=1)
+    rpn_box_loss = rpn_box_lw * tf.reduce_mean(rpn_box_loss)
+
+    labels = slim.one_hot_encoding(labels, 2, on_value=1.0, off_value=0.0)
+    rpn_cls_loss = rpn_cls_lw * tf.losses.softmax_cross_entropy(classes, labels)
+    
+    ### refined loss
+    # 1. encode ground truth
+    # 2. compute distances
+    boxes = outputs[p]['refined']['box']
+    classes = outputs[p]['refined']['cls']
+    labels, rois, bbox_targets, bbox_inside_weights = \
+      roi_encoder(gt_boxes, boxes, num_classes, scope='ROIEncoder')
+    refined_box_loss = bbox_inside_weights * _smooth_l1_dist(boxes, bbox_targets)
+    refined_box_loss = tf.reshape(refined_box_loss, [-1, 4])
+    refined_box_loss = tf.reduce_sum(refined_box_loss, axis=1)
+    refined_box_loss = refined_box_lw * tf.reduce_mean(refined_box_loss)
+
+    labels = slim.one_hot_encoding(labels, num_classes, on_value=1.0, off_value=0.0)
+    refined_cls_loss = refined_cls_lw * tf.losses.softmax_cross_entropy(classes, labels)
+
+    ### mask loss
+    # {'mask': m, 'classes': classes, 'scores': scores}
+    # TODO: re-sample in encoder? or outside?
+    masks = outputs[p]['mask']['mask']
+    rois, labels, mask_targets, mask_inside_weights = \
+      mask_encoder(gt_masks, gt_boxes, rois, num_classes, 28, 28, scope='MaskEncoder')
+    
+    
+  return

@@ -23,4 +23,6 @@ pyramid = pyramid_network.build_pyramid('resnet50', end_points)
 for p in pyramid:
   print (p, pyramid[p])
 
-outputs = pyramid_network.build_head(pyramid, num_classes=81, base_anchors=15, is_training=True)
+outputs = pyramid_network.build_heads(pyramid, num_classes=81, base_anchors=15, is_training=True)
+
+outputs = pyramid_network.build_losses(pyramid, outputs)
