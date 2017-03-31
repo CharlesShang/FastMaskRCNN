@@ -4,15 +4,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import functools
-
+import os, sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-from libs.logs.log import LOG
 import libs.configs.config_v1 as cfg
 import libs.datasets.coco as coco
 import libs.nets.resnet_v1 as resnet_v1
-import libs.datasets.dataset_factory as dataset_factory
 from libs.nets.train_utils import _configure_learning_rate, _configure_optimizer, \
   _get_variables_to_train, _get_init_fn
 
