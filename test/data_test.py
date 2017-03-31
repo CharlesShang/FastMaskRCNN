@@ -17,56 +17,25 @@ resnet50 = resnet_v1.resnet_v1_50
 FLAGS = tf.app.flags.FLAGS
 
 with tf.Graph().as_default():
-  dataset = dataset_factory.get_dataset(
-    FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir)
-  
-  num_classes = dataset.num_classes
-  
-  # provider = slim.dataset_data_provider.DatasetDataProvider(
-  #   dataset,
-  #   num_readers=FLAGS.num_readers,
-  #   common_queue_capacity=4,
-  #   common_queue_min=2)
-  # [image, label, gt_masks, gt_boxes, ih, iw] = provider.get(['image', 'label',
-  #                                                            'gt_masks', 'gt_boxes',
-  #                                                            'height', 'width'])
 
-  image, ih, iw, gt_boxes, gt_masks, num_instances = \
-    coco.read('./data/coco/records/coco_train2014_00000-of-00040.tfrecord')
+  image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = \
+    coco.read('./data/coco/records-back/coco_train2014_00000-of-00040.tfrecord')
+
+  sess = tf.Session()
   init_op = tf.group(tf.global_variables_initializer(),
                      tf.local_variables_initializer())
-  
-  with tf.Session()  as sess:
-  
-    sess.run(init_op)
+  tf.train.start_queue_runners(sess=sess)
+  sess.run(init_op)
+  with sess.as_default():
+    npimage = image.eval()
+    npih = ih.eval()
+    npiw = iw.eval()
+    npnum_instances = num_instances.eval()
+    npgt_masks = gt_masks.eval()
+    npgt_boxes = gt_boxes.eval()
+    
+    print (img_id.eval())
 
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(coord=coord)
-    for i in xrange(3):
-      npimage = image.eval()
-      npih = ih.eval()
-      npiw = iw.eval()
-      npnum_instances = num_instances.eval()
-      npgt_masks = gt_masks.eval()
-      npgt_boxes = gt_boxes.eval()
-
-      print(npgt_boxes)
-      print(npih, npiw, npnum_instances)
-
-    # dataset = dataset_factory.get_dataset(
-    #   FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir)
-    # num_classes = dataset.num_classes
-    # provider = slim.dataset_data_provider.DatasetDataProvider(
-    #     dataset,
-    #     num_readers=1,
-    #     common_queue_capacity=1,
-    #     common_queue_min=0)
-    # [image, label, gt_masks, gt_boxes, ih, iw] = \
-    #   provider.get(['image', 'label',
-    #                'gt_masks', 'gt_boxes',
-    #                'height', 'width'])
-    # npimage = image.eval()
-    print (npimage)
-
-  coord.request_stop()
-  coord.join(threads)
+    # print(npimage)
+    print(npgt_boxes)
+    print(npih, npiw, npnum_instances)
