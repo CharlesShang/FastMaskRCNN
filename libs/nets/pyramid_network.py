@@ -118,13 +118,17 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
       rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='%s/rpn'%p)
       box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p)
       cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p)
+      cls_prob = tf.reshape(tf.nn.softmax(
+                            tf.reshape(cls,
+                            [1, shape[1], shape[2], base_anchors, 2])),
+                            [1, shape[1], shape[2], base_anchors * 2])
       outputs[p]['rpn'] = {'box': box,
                            'cls': cls}
       
       # decode, sample and crop
       all_anchors = gen_all_anchors(height, width, stride)
       rois, classes, scores = \
-                anchor_decoder(box, cls, all_anchors, ih, iw)
+                anchor_decoder(box, cls_prob, all_anchors, ih, iw)
       rois, scores = sample_rpn_outputs(rois, scores)
       cropped = ROIAlign(pyramid[p], rois, False, stride=2**i,
                          pooled_height=7, pooled_width=7,)
@@ -143,8 +147,9 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
       outputs[p]['refined'] = {'box': box, 'cls': cls2}
       
       # decode refine net outputs
+      cls2_prob = tf.nn.softmax(cls2)
       final_boxes, classes, scores = \
-              roi_decoder(box, cls2, rois, ih, iw)
+              roi_decoder(box, cls2_prob, rois, ih, iw)
       
       # for testing, maskrcnn takes refined boxes as inputs
       if not is_training:
