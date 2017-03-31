@@ -11,6 +11,7 @@ import numpy as np
 import tensorflow as tf
 from six.moves import urllib
 from PIL import Image
+import skimage.io as io
 from matplotlib import pyplot as plt
 
 from libs.datasets.pycocotools.coco import COCO
@@ -165,6 +166,24 @@ def _to_tfexample_coco(image_data, image_format, label_data, label_format,
   }))
 
 
+def _to_tfexample_coco_raw(image_id, image_data, label_data,
+                           height, width,
+                           num_instances, gt_boxes, masks):
+  """ just write a raw input"""
+  return tf.train.Example(features=tf.train.Features(feature={
+    'image/img_id': _int64_feature(image_id),
+    'image/encoded': _bytes_feature(image_data),
+    'image/height': _int64_feature(height),
+    'image/width': _int64_feature(width),
+    
+    'label/num_instances': _int64_feature(num_instances),  # N
+    'label/gt_boxes': _bytes_feature(gt_boxes),  # of shape (N, 5), (x1, y1, x2, y2, classid)
+    'label/gt_masks': _bytes_feature(masks),  # of shape (N, height, width)
+    
+    'label/encoded': _bytes_feature(label_data),  # deprecated, this is used for pixel-level segmentation
+  }))
+
+
 def _get_coco_masks(coco, img_id, height, width, img_name):
   """ get the masks for all the instances
   Note: some images are not annotated
@@ -267,23 +286,21 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
               continue
             
             # process anns
-            h, w = imgs[i][1]['height'], imgs[i][1]['width']
-            gt_boxes, masks, mask = _get_coco_masks(coco, img_id, h, w, img_name)
-            # this encode matrix to png format string buff
-            label_data = sess.run(encoded_image,
-                                  feed_dict={mask_placeholder: np.expand_dims(mask, axis=2)})
+            height, width = imgs[i][1]['height'], imgs[i][1]['width']
+            gt_boxes, masks, mask = _get_coco_masks(coco, img_id, height, width, img_name)
             
-            # read image
-            assert os.path.exists(img_name), '%s dont exists'% img_name
-            image_data = tf.gfile.FastGFile(img_name, 'r').read()
-            height, width, depth = image_reader.read_jpeg_dims(sess, image_data)
+            # read image as RGB numpy
+            img = np.array(Image.open(img_name))
+            img_raw = img.tostring()
+            mask_raw = mask.tostring()
             
-            # to tf-record
-            example = _to_tfexample_coco(
-              image_data, 'jpg',
-              label_data, 'png',
+            example = _to_tfexample_coco_raw(
+              img_id,
+              img_raw,
+              mask_raw,
               height, width, gt_boxes.shape[0],
               gt_boxes.tostring(), masks.tostring())
+            
             tfrecord_writer.write(example.SerializeToString())
   sys.stdout.write('\n')
   sys.stdout.flush()
