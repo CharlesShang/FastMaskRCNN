@@ -56,11 +56,11 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   # TODO: speed bottleneck?
   for i in keep_inds:
     roi = rois[i, :4]
-    cropped = gt_masks[gt_assignment[i], roi[1]:roi[3]+1, roi[0]:roi[2]+1]
+    cropped = gt_masks[gt_assignment[i], int(roi[1]):int(roi[3])+1, int(roi[0]):int(roi[2])+1]
     cropped = cv2.resize(cropped, (mask_width, mask_height), interpolation=cv2.INTER_NEAREST)
     
-    mask_targets[i, :, :, labels[i]] = cropped
-    mask_inside_weights[i, :, :, labels[i]] = 1
+    mask_targets[i, :, :, int(labels[i])] = cropped
+    mask_inside_weights[i, :, :, int(labels[i])] = 1
   return labels, mask_targets, mask_inside_weights
 
 def decode(mask_targets, rois, classes, ih, iw):

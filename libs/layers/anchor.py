@@ -8,6 +8,7 @@ import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 from libs.boxes.anchor import anchors_plane
+from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
 def encode(gt_boxes, all_anchors, height, width, stride):
@@ -130,16 +131,14 @@ def decode(boxes, scores, all_anchors, ih, iw):
   all_anchors = all_anchors.reshape((-1, 4))
   boxes = boxes.reshape((-1, 4))
   scores = scores.reshape((-1, 2))
-  assert scores.shape[0] == boxes.shape[0] == all_anchors.reshape[0], \
+  assert scores.shape[0] == boxes.shape[0] == all_anchors.shape[0], \
     'Anchor layer shape error %d vs %d vs %d' % (scores.shape[0],boxes.shape[0],all_anchors.reshape[0])
   boxes = bbox_transform_inv(all_anchors, boxes)
   classes = np.argmax(scores, axis=1)
   scores = scores[:, 1]
-  final_boxes = np.zeros((boxes.shape[0], 4))
-  for i in np.arange(final_boxes.shape[0]):
-    c = classes[i] * 4
-    final_boxes[i, 0:4] = boxes[i, c:c+4]
+  final_boxes = boxes  
   final_boxes = clip_boxes(final_boxes, (ih, iw))
+  classes = classes.astype(np.int32)
   return final_boxes, classes, scores
 
 def sample(boxes, scores, ih, iw, is_training):

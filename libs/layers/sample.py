@@ -7,6 +7,7 @@ import numpy as np
 
 import libs.configs.config_v1 as cfg
 import libs.boxes.nms_wrapper as nms_wrapper
+from libs.logs.log import LOG
 
 
 def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
@@ -54,6 +55,7 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
     keeps = keeps[:post_nms_top_n]
   boxes = boxes[keeps, :]
   scores = scores[keeps]
+  LOG('%d rois has been choosen' % len(keeps))
   
   return boxes, scores
 

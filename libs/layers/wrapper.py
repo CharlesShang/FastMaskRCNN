@@ -110,16 +110,15 @@ def mask_decoder(mask_targets, rois, classes, ih, iw, scope='MaskDecoder'):
 def sample_wrapper(boxes, scores, is_training=False, scope='SampleBoxes'):
   
   with tf.name_scope(scope) as sc:
-    boxes, class_ids, scores = \
+    boxes, scores = \
       tf.py_func(sample.sample_rpn_outputs,
                  [boxes, scores, is_training],
-                 [tf.float32, tf.int32, tf.float32])
+                 [tf.float32, tf.float32])
     boxes = tf.convert_to_tensor(boxes, name='Boxes')
-    class_ids = tf.convert_to_tensor(tf.cast(class_ids, tf.int32), name='Ids')
     scores = tf.convert_to_tensor(scores, name='Scores')
     boxes = tf.reshape(boxes, (-1, 4))
   
-  return boxes, class_ids, scores
+  return boxes, scores
 
 def gen_all_anchors(height, width, stride, scope='GenAnchors'):
   

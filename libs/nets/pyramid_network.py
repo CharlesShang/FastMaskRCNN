@@ -36,13 +36,13 @@ def _extra_conv_arg_scope(weight_decay=0.00005, activation_fn=None, normalizer_f
       [slim.conv2d, slim.conv2d_transpose],
       padding='SAME',
       weights_regularizer=slim.l2_regularizer(weight_decay),
-      weights_initializer=slim.variance_scaling_initializer(),
+      weights_initializer=slim.variance_scaling_initializer(0.1),
       activation_fn=activation_fn,
       normalizer_fn=normalizer_fn,) as arg_sc:
     with slim.arg_scope(
       [slim.fully_connected],
           weights_regularizer=slim.l2_regularizer(weight_decay),
-          weights_initializer=slim.variance_scaling_initializer(),
+          weights_initializer=slim.variance_scaling_initializer(0.1),
           activation_fn=activation_fn,
           normalizer_fn=normalizer_fn) as arg_sc:
         return arg_sc
@@ -125,7 +125,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
       all_anchors = gen_all_anchors(height, width, stride)
       rois, classes, scores = \
                 anchor_decoder(box, cls, all_anchors, ih, iw)
-      rois, class_ids, scores = sample_rpn_outputs(rois, scores)
+      rois, scores = sample_rpn_outputs(rois, scores)
       cropped = ROIAlign(pyramid[p], rois, False, stride=2**i,
                          pooled_height=7, pooled_width=7,)
 
@@ -151,7 +151,6 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
         rois = final_boxes
       
       # mask head
-      # rois, class_ids, scores = sample_rpn_outputs(rois, scores)
       m = ROIAlign(pyramid[p], rois, False, stride=2 ** i,
                    pooled_height=14, pooled_width=14)
       outputs[p]['roi']['cropped_mask'] = m
