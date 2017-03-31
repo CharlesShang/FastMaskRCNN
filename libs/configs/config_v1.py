@@ -6,7 +6,7 @@ import tensorflow as tf
 
 
 tf.app.flags.DEFINE_string(
-    'train_dir', './train/tensorflow/',
+    'train_dir', './train/maskrcnn/',
     'Directory where checkpoints and event logs are written to.')
 
 tf.app.flags.DEFINE_integer(

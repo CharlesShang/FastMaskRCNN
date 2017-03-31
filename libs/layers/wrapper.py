@@ -127,9 +127,9 @@ def gen_all_anchors(height, width, stride, scope='GenAnchors'):
     all_anchors = \
       tf.py_func(anchors_plane,
                  [height, width, stride],
-                 [tf.float32]
+                 [tf.float64]
                  )
-    all_anchors = tf.convert_to_tensor(all_anchors, name='AllAnchors')
+    all_anchors = tf.convert_to_tensor(tf.cast(all_anchors, tf.float32), name='AllAnchors')
     all_anchors = tf.reshape(all_anchors, (height, width, -1))
     
     return all_anchors

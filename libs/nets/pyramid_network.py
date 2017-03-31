@@ -68,7 +68,7 @@ def build_pyramid(net_name, end_points, bilinear=True):
   """
   pyramid = {}
   convs_map = _networks_map[net_name]
-  pyramid['inputs'] = end_points['inputs']
+  # pyramid['inputs'] = end_points['inputs']
   arg_scope = _extra_conv_arg_scope()
   with tf.name_scope('pyramid'):
     with slim.arg_scope(arg_scope):
@@ -81,17 +81,17 @@ def build_pyramid(net_name, end_points, bilinear=True):
 
         s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
         
-        up_shape = s_.get_shape()
-        out_shape = tf.stack((up_shape[1], up_shape[2]))
+        up_shape = tf.shape(s_)
+        # out_shape = tf.stack((up_shape[1], up_shape[2]))
         # s = slim.conv2d(s, 256, [3, 3], stride=1, scope='C%d'%c)
-        s = tf.image.resize_bilinear(s, out_shape, name='C%d/upscale'%c)
+        s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='C%d/upscale'%c)
         
         s = tf.add(s, s_, name='C%d/addition'%c)
         pyramid['P%d'%(c)] = s
       
       return pyramid
   
-def build_heads(pyramid, num_classes, base_anchors, is_training=False):
+def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
   """Build the 3-way outputs, i.e., class, box and mask in the pyramid
   Algo
   ----
@@ -104,8 +104,6 @@ def build_heads(pyramid, num_classes, base_anchors, is_training=False):
     6. Build losses
   """
   outputs = {}
-  inshape = tf.shape(pyramid['inputs'])
-  ih, iw = inshape[1], inshape[2]
   arg_scope = _extra_conv_arg_scope(activation_fn=None)
   with slim.arg_scope(arg_scope):
     # for p in pyramid:
@@ -202,6 +200,7 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
     rpn_box_loss = tf.reshape(rpn_box_loss, [-1, 4])
     rpn_box_loss = tf.reduce_sum(rpn_box_loss, axis=1)
     rpn_box_loss = rpn_box_lw * tf.reduce_mean(rpn_box_loss)
+    tf.add_to_collection(tf.GraphKeys.LOSSES, rpn_box_loss)
 
     labels = slim.one_hot_encoding(labels, 2, on_value=1.0, off_value=0.0)
     rpn_cls_loss = rpn_cls_lw * tf.losses.softmax_cross_entropy(classes, labels)
@@ -219,6 +218,7 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
     refined_box_loss = tf.reshape(refined_box_loss, [-1, 4])
     refined_box_loss = tf.reduce_sum(refined_box_loss, axis=1)
     refined_box_loss = refined_box_lw * tf.reduce_mean(refined_box_loss)
+    tf.add_to_collection(tf.GraphKeys.LOSSES, refined_box_loss)
 
     labels = slim.one_hot_encoding(labels, num_classes, on_value=1.0, off_value=0.0)
     refined_cls_loss = refined_cls_lw * tf.losses.softmax_cross_entropy(classes, labels)
