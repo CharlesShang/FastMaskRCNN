@@ -15,9 +15,11 @@ However, we aim to build an end-to-end framework in the first place.
 - [x] Anchor and ROI layer
 - [x] Mask layer
 - [x] Speedup anchor layer with cython
-- [ ] Combining all modules together. 
-- [ ] Testing and debugging (I feel a little bit lucky..)
+- [x] Combining all modules together. 
+- [ ] Testing and debugging (in progress)
 - [ ] Training / evaluation on COCO
+- [ ] Data queue
+- [ ] Data agument
 - [ ] Other backbone networks
 - [ ] Training >2 images
 
