@@ -1,3 +1,4 @@
+# coding=utf-8
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -9,6 +10,7 @@ import libs.configs.config_v1 as cfg
 from libs.logs.log import LOG
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 
+_DEBUG = True
 def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   """Encode masks groundtruth into learnable targets
   Sample some exmaples
@@ -27,7 +29,7 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   # rois: boxes sampled for cropping masks, of shape (M, 4)
   labels: class-ids of shape (M, 1)
   mask_targets: learning targets of shape (M, pooled_height, pooled_width, K) in {0, 1} values
-  mask_inside_weights: of shape (M, pooled_height, pooled_width, K) in {0, 1} indicating which mask is sampled
+  mask_inside_weights: of shape (M, pooled_height, pooled_width, K) in {0, 1}Í indicating which mask is sampled
   """
   total_masks = rois.shape[0]
   # B x G
@@ -36,12 +38,13 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
   gt_assignment = overlaps.argmax(axis=1)  # shape is N
   max_overlaps = overlaps[np.arange(len(gt_assignment)), gt_assignment] # N
+  # note: this will assign every rois with a positive label 
   labels = gt_boxes[gt_assignment, 4] # N
 
   # sample positive rois which intersection is more than 0.5
   keep_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
   num_masks = int(min(keep_inds.size, cfg.FLAGS.masks_per_image))
-  if keep_inds.size > 0:
+  if keep_inds.size > 0 and num_masks < keep_inds.size:
     keep_inds = np.random.choice(keep_inds, size=num_masks, replace=False)
     LOG('Masks: %d of %d rois are considered positive mask. Number of masks %d'\
                  %(num_masks, rois.shape[0], gt_masks.shape[0]))
@@ -50,8 +53,13 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   # labels = labels[inds].astype(np.int32)
   # gt_assignment = gt_assignment[inds]
 
+  # ignore rois with overlaps between fg_threshold and bg_threshold 
+  ignore_inds = np.where((max_overlaps < cfg.FLAGS.fg_threshold))[0]
+  labels[ignore_inds] = -1 
+
   mask_targets = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.int32)
   mask_inside_weights = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.float32)
+  rois [rois < 0] = 0
   
   # TODO: speed bottleneck?
   for i in keep_inds:

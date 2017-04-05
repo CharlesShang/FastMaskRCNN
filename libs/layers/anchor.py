@@ -46,17 +46,18 @@ def encode(gt_boxes, all_anchors, height, width, stride):
   
   # choose boxes to assign to this stride
   # TODO gt assignment outside
-  areas = (gt_boxes[:, 3] - gt_boxes[:, 1] + 1) * (gt_boxes[:, 2] - gt_boxes[:, 0] + 1)
-  ks = np.floor(4 + np.log2(np.sqrt(areas) / 224.0))
-  K = int(np.log2(stride))
-  inds = np.where((K == ks + 4))[0]
-  if inds.size > 0:
-    gt_boxes = gt_boxes[inds]
-  else:
-    labels = np.zeros((total_anchors), dtype=np.float32)
-    bbox_targets = np.zeros((total_anchors, 4), dtype=np.float32)
-    bbox_inside_weights = np.zeros((total_anchors, 4), dtype=np.float32)
-    return labels, bbox_targets, bbox_inside_weights
+  if False:
+    areas = (gt_boxes[:, 3] - gt_boxes[:, 1] + 1) * (gt_boxes[:, 2] - gt_boxes[:, 0] + 1)
+    ks = np.floor(4 + np.log2(np.sqrt(areas) / 224.0))
+    K = int(np.log2(stride))
+    inds = np.where((K == ks + 4))[0]
+    if inds.size > 0:
+      gt_boxes = gt_boxes[inds]
+    else:
+      labels = np.zeros((total_anchors), dtype=np.float32)
+      bbox_targets = np.zeros((total_anchors, 4), dtype=np.float32)
+      bbox_inside_weights = np.zeros((total_anchors, 4), dtype=np.float32)
+      return labels, bbox_targets, bbox_inside_weights
 
   labels = np.zeros((anchors.shape[0], ), dtype=np.float32)
   overlaps = cython_bbox.bbox_overlaps(

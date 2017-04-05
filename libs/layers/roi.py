@@ -15,15 +15,14 @@ def encode(gt_boxes, rois, num_classes):
   Parameters
   ---------
   gt_boxes an array of shape (G x 5), [x1, y1, x2, y2, class]
-  gt_classes an array of shape (G x 1), each value is in [0, num_classes]
   rois an array of shape (R x 4), [x1, y1, x2, y2]
+  num_classes: scalar, number of classes
   
   Returns
   --------
   labels: Nx1 array in [0, num_classes)
-  # rois:   Sampled rois of shape (N, 4)
-  bbox_targets: N x (Kx4) regression targets
-  bbox_inside_weights: N x (Kx4), in {0, 1} indicating which class is assigned.
+  bbox_targets: of shape (N, Kx4) regression targets
+  bbox_inside_weights: of shape (N, Kx4), in {0, 1} indicating which class is assigned.
   """
   
   all_rois = rois
@@ -35,12 +34,17 @@ def encode(gt_boxes, rois, num_classes):
   gt_assignment = overlaps.argmax(axis=1)  # R
   # max_overlaps = overlaps.max(axis=1)      # R
   max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
+  # note: this will assign every rois with a positive label 
   labels = gt_boxes[gt_assignment, 4]
+  _DEBUG = True
+  if _DEBUG:
+      print ('gt_assignment')
+      print (gt_assignment)
 
   # sample rois as to 1:3
   fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
   fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
-  if fg_inds.size > 0:
+  if fg_inds.size > 0 and fg_rois < fg_inds.size:
     fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
   # print(fg_rois)
   
@@ -51,7 +55,21 @@ def encode(gt_boxes, rois, num_classes):
   if bg_inds.size > 0 and bg_rois < bg_inds.size:
     bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
+  # ignore rois with overlaps between fg_threshold and bg_threshold 
+  ignore_inds = np.where(((max_overlaps > cfg.FLAGS.bg_threshold) &\
+          (max_overlaps < cfg.FLAGS.fg_threshold)))[0]
+  labels[ignore_inds] = -1 
   keep_inds = np.append(fg_inds, bg_inds)
+  if _DEBUG: 
+      print ('keep_inds')
+      print (keep_inds)
+      print ('fg_inds')
+      print (fg_inds)
+      print ('bg_inds')
+      print (bg_inds)
+      print ('bg_rois:', bg_rois)
+      print ('cfg.FLAGS.bg_threshold:', cfg.FLAGS.bg_threshold)
+      print (max_overlaps)
 
   bbox_targets, bbox_inside_weights = _compute_targets(
     rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
@@ -76,8 +94,9 @@ def decode(boxes, scores, rois, ih, iw):
   """
   boxes = bbox_transform_inv(rois, deltas=boxes)
   classes = np.argmax(scores, axis=1)
+  classes = classes.astype(np.int32)
   scores = np.max(scores, axis=1)
-  final_boxes = np.zeros((boxes.shape[0], 4))
+  final_boxes = np.zeros((boxes.shape[0], 4), dtype=np.float32)
   for i in np.arange(0, boxes.shape[0]):
     ind = classes[i]*4
     final_boxes[i, 0:4] = boxes[i, ind:ind+4]

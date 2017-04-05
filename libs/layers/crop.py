@@ -5,22 +5,35 @@ from __future__ import print_function
 import tensorflow as tf
 
 def crop(images, boxes, batch_inds = False, stride = 1, pooled_height = 7, pooled_width = 7, scope='ROIAlign'):
-  """Cropping areas of features into fixed size"""
+  """Cropping areas of features into fixed size
+  Params:
+  --------
+  images: a 4-d Tensor of shape (N, H, W, C)
+  boxes: rois in the original image, of shape (N, ..., 4), [x1, y1, x2, y2]
+  batch_inds: 
+
+  Returns:
+  --------
+  A Tensor of shape (N, pooled_height, pooled_width, C)
+  """
   with tf.name_scope(scope):
+    #
     boxes = boxes / (stride + 0.0)
+    boxes = tf.reshape(boxes, [-1, 4])
+
+    # normalize the boxes and swap x y dimensions
     shape = tf.shape(images)
     boxes = tf.reshape(boxes, [-1, 2]) # to (x, y)
-    x = tf.slice(boxes, [0, 0], [-1, 1])
-    y = tf.slice(boxes, [0, 1], [-1, 1])
-    x = x / tf.cast(shape[2], tf.float32)
-    y = y / tf.cast(shape[1], tf.float32)
-    boxes = tf.concat([y, x], axis=1)
+    xs = boxes[:, 0] 
+    xy = boxes[:, 1]
+    xs = xs / tf.cast(shape[2], tf.float32)
+    ys = ys / tf.cast(shape[1], tf.float32)
+    boxes = tf.concat([ys[:, tf.newaxis], xs[:, tf.newaxis]], axis=1)
     boxes = tf.reshape(boxes, [-1, 4])  # to (y1, x1, y2, x2)
     
     if batch_inds is False:
-      shape = tf.shape(boxes)
-      # batch_inds = tf.zeros((shape[0], ), dtype=tf.int32, name='batch_inds')
-      batch_inds = tf.zeros([shape[0]], dtype=tf.int32, name='batch_inds')
+      num_boxes = tf.shape(boxes)[0]
+      batch_inds = tf.zeros([num_boxes], dtype=tf.int32, name='batch_inds')
     return  tf.image.crop_and_resize(images, boxes, batch_inds,
                                      [pooled_height, pooled_width],
                                      method='bilinear',

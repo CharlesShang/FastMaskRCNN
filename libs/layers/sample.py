@@ -15,7 +15,7 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   assuming the first class is background
   Params:
   boxes: of shape (..., Ax4), each entry is [x1, y1, x2, y2], the last axis has k*4 dims
-  scores: of shape (..., A), foreground prob
+  scores: of shape (..., A), probs of fg, in [0, 1]
   """
   min_size = cfg.FLAGS.min_size
   rpn_nms_threshold = cfg.FLAGS.rpn_nms_threshold

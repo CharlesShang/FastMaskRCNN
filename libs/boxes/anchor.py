@@ -124,5 +124,6 @@ if __name__ == '__main__':
   print('average time: %f' % ((time.time() - t) / 10))
   print('anchors: %d' % (num_anchors / 10))
   print(a.shape, '\n', a)
+  print (all_anchors.shape)
   # from IPython import embed
   # embed()
