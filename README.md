@@ -4,8 +4,6 @@ Mask RCNN in TensorFlow
 ## See you in one week
 This repo attempts to reporduce this amazing work by Kaiming He.
 [Mask RCNN](https://arxiv.org/abs/1703.06870).
-The original work involves two stages, a pyramid Faster-RCNN for object detection and another network (with the same structure) for instance level segmentation. 
-However, we aim to build an end-to-end framework in the first place. 
 
 ## Timeline
 - [x] ROIAlign
