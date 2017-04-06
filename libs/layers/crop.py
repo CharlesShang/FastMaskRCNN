@@ -25,7 +25,7 @@ def crop(images, boxes, batch_inds = False, stride = 1, pooled_height = 7, poole
     shape = tf.shape(images)
     boxes = tf.reshape(boxes, [-1, 2]) # to (x, y)
     xs = boxes[:, 0] 
-    xy = boxes[:, 1]
+    ys = boxes[:, 1]
     xs = xs / tf.cast(shape[2], tf.float32)
     ys = ys / tf.cast(shape[1], tf.float32)
     boxes = tf.concat([ys[:, tf.newaxis], xs[:, tf.newaxis]], axis=1)
