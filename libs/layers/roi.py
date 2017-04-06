@@ -36,7 +36,7 @@ def encode(gt_boxes, rois, num_classes):
   max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
   # note: this will assign every rois with a positive label 
   labels = gt_boxes[gt_assignment, 4]
-  _DEBUG = True
+  _DEBUG = False 
   if _DEBUG:
       print ('gt_assignment')
       print (gt_assignment)

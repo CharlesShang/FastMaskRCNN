@@ -54,6 +54,7 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   # gt_assignment = gt_assignment[inds]
 
   # ignore rois with overlaps between fg_threshold and bg_threshold 
+  # mask are only defined on positive rois
   ignore_inds = np.where((max_overlaps < cfg.FLAGS.fg_threshold))[0]
   labels[ignore_inds] = -1 
 
