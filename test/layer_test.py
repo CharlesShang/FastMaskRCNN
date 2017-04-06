@@ -204,6 +204,36 @@ class sample_test(layer_test):
             np.set_printoptions(precision=3, suppress=True)
             print (bs)
 
+class ROIAlign_test(layer_test):
+
+    def __init__(self, N, num_classes, height, width, gt_boxes=None, gt_masks=None, rois=None, classes=None):
+        super(ROIAlign_test, self).__init__(N, num_classes, height, width, gt_boxes, gt_masks, rois, classes)
+
+    def test(self):
+        with tf.Session() as sess:
+            npimg = np.random.rand(1, self.height, self.width, 2).astype(np.float32)
+            npimg = np.zeros((1, self.height, self.width, 1), dtype=np.float32)
+
+            boxes = np.random.randint(0, 50, [self.N, 2])
+            s = np.random.randint(20, 30, [self.N, 2])
+            boxes = np.hstack((boxes, boxes + s)).astype(np.float32)
+
+            stride = 2.0 
+            for i in range(self.N):
+                b = boxes[i, :] / stride
+                npimg[:, 
+                      int(b[1]):int(b[3]+1),
+                      int(b[0]):int(b[2]+1),
+                      :] = 1 
+                
+            img = tf.constant(npimg)
+            pooled_height = 5
+            pooled_width = 5
+            feats = ROIAlign(img, boxes, False, stride=stride, pooled_height=pooled_height, pooled_width=pooled_width,)
+            self.feats = feats.eval()
+            print (self.feats.shape)
+            print (self.feats.reshape((self.N, pooled_height, pooled_width)))
+
 
 if __name__ == '__main__':
     print ('##############################')
@@ -226,3 +256,8 @@ if __name__ == '__main__':
     print ('##############################')
     s_test  = sample_test(20, 4, 100, 100)
     s_test.test()
+    print ('##############################')
+    print ('ROIAlign Test')
+    print ('##############################')
+    c_test  = ROIAlign_test(5, 4, 100, 100)
+    c_test.test()
