@@ -29,6 +29,9 @@ tf.app.flags.DEFINE_integer(
     'save_interval_secs', 7200,
     'The frequency with which the model is saved, in seconds.')
 
+tf.app.flags.DEFINE_integer(
+    'max_iters', 1500000,
+    'max iterations')
 
 ######################
 # Optimization Flags #
