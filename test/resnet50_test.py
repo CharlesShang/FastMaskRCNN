@@ -67,8 +67,6 @@ with tf.Graph().as_default():
   summaries.add(tf.summary.scalar('learning_rate', learning_rate))
   for loss in tf.get_collection(tf.GraphKeys.LOSSES):
     summaries.add(tf.summary.scalar('losses/%s' % loss.op.name, loss))
-  learning_rate = _configure_learning_rate(82783, global_step)
-  optimizer = _configure_optimizer(learning_rate)
 
   loss = tf.get_collection(tf.GraphKeys.LOSSES)
   regular_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
@@ -106,13 +104,8 @@ with tf.Graph().as_default():
   #   # print(npimage)
   #   print(npgt_boxes)
   #   print(npih, npiw, npnum_instances)
-    
-  slim.learning.train(
-    update_op,
-    logdir=FLAGS.train_dir,
-    init_fn=_get_init_fn(),
-    summary_op=summary_op,
-    number_of_steps=FLAGS.max_number_of_steps,
-    log_every_n_steps=FLAGS.log_every_n_steps,
-    save_summaries_secs=FLAGS.save_summaries_secs,
-    save_interval_secs=FLAGS.save_interval_secs)
+
+  with sess.as_default():  
+    for i in range(FLAGS.max_iters):
+      sess.run(update_op)
+      print ('iter %d' %(i))
