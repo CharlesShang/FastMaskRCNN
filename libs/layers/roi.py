@@ -9,6 +9,8 @@ import libs.configs.config_v1 as cfg
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 # FLAGS = tf.app.flags.FLAGS
 
+_DEBUG = False 
+
 def encode(gt_boxes, rois, num_classes):
   """Matching and Encoding groundtruth boxes (gt_boxes) into learning targets to boxes
   Sampling
@@ -27,55 +29,66 @@ def encode(gt_boxes, rois, num_classes):
   
   all_rois = rois
   num_rois = rois.shape[0]
-  # R x G matrix
-  overlaps = cython_bbox.bbox_overlaps(
-    np.ascontiguousarray(all_rois[:, 0:4], dtype=np.float),
-    np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
-  gt_assignment = overlaps.argmax(axis=1)  # R
-  # max_overlaps = overlaps.max(axis=1)      # R
-  max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
-  # note: this will assign every rois with a positive label 
-  labels = gt_boxes[gt_assignment, 4]
-  _DEBUG = False 
-  if _DEBUG:
-      print ('gt_assignment')
-      print (gt_assignment)
+  if gt_boxes.size > 0: 
+      # R x G matrix
+      overlaps = cython_bbox.bbox_overlaps(
+        np.ascontiguousarray(all_rois[:, 0:4], dtype=np.float),
+        np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
+      gt_assignment = overlaps.argmax(axis=1)  # R
+      # max_overlaps = overlaps.max(axis=1)      # R
+      max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
+      # note: this will assign every rois with a positive label 
+      labels = gt_boxes[gt_assignment, 4]
 
-  # sample rois as to 1:3
-  fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
-  fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
-  if fg_inds.size > 0 and fg_rois < fg_inds.size:
-    fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
-  # print(fg_rois)
-  
-  bg_rois = cfg.FLAGS.rois_per_image - fg_rois
-  bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-  labels[bg_inds] = 0
-  # print(bg_rois)
-  if bg_inds.size > 0 and bg_rois < bg_inds.size:
-    bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
+      if _DEBUG:
+          print ('gt_assignment')
+          print (gt_assignment)
 
-  # ignore rois with overlaps between fg_threshold and bg_threshold 
-  ignore_inds = np.where(((max_overlaps > cfg.FLAGS.bg_threshold) &\
-          (max_overlaps < cfg.FLAGS.fg_threshold)))[0]
-  labels[ignore_inds] = -1 
-  keep_inds = np.append(fg_inds, bg_inds)
-  if _DEBUG: 
-      print ('keep_inds')
-      print (keep_inds)
-      print ('fg_inds')
-      print (fg_inds)
-      print ('bg_inds')
-      print (bg_inds)
-      print ('bg_rois:', bg_rois)
-      print ('cfg.FLAGS.bg_threshold:', cfg.FLAGS.bg_threshold)
-      print (max_overlaps)
+      # sample rois as to 1:3
+      fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
+      fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
+      if fg_inds.size > 0 and fg_rois < fg_inds.size:
+        fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
+      # print(fg_rois)
+      
+      bg_rois = cfg.FLAGS.rois_per_image - fg_rois
+      bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
+      labels[bg_inds] = 0
+      # print(bg_rois)
+      if bg_inds.size > 0 and bg_rois < bg_inds.size:
+        bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
-  bbox_targets, bbox_inside_weights = _compute_targets(
-    rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
-  bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
-  bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
+      # ignore rois with overlaps between fg_threshold and bg_threshold 
+      ignore_inds = np.where(((max_overlaps > cfg.FLAGS.bg_threshold) &\
+              (max_overlaps < cfg.FLAGS.fg_threshold)))[0]
+      labels[ignore_inds] = -1 
+      keep_inds = np.append(fg_inds, bg_inds)
+      if _DEBUG: 
+          print ('keep_inds')
+          print (keep_inds)
+          print ('fg_inds')
+          print (fg_inds)
+          print ('bg_inds')
+          print (bg_inds)
+          print ('bg_rois:', bg_rois)
+          print ('cfg.FLAGS.bg_threshold:', cfg.FLAGS.bg_threshold)
+          print (max_overlaps)
+
+      bbox_targets, bbox_inside_weights = _compute_targets(
+        rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
+      bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
+      bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
    
+  else:
+      # there is no gt
+      labels = np.zeros((num_rois, ), np.float32)
+      bbox_targets = np.zeros((num_rois, 4 * num_classes), np.float32)
+      bbox_inside_weights = np.zeros((num_rois, 4 * num_classes), np.float32)
+      bg_rois  = int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction))
+      if bg_rois < num_rois:
+          bg_inds = np.arange(num_rois)
+          ignore_inds = np.random.choice(bg_inds, size=num_rois - bg_rois, replace=False)
+          labels[ignore_inds] = -1 
   return labels, bbox_targets, bbox_inside_weights
 
 def decode(boxes, scores, rois, ih, iw):

@@ -113,11 +113,13 @@ class roi_test(layer_test):
         with tf.Session() as sess:
             rois = self.gt_boxes[:, :4]
             rois = rois + np.random.randint(-3, 3, (self.N, 4))
-            bgs = np.random.randint(0, 60, (self.N, 2))
-            bgs = np.hstack((bgs, bgs + np.random.randint(20, 30, (self.N, 2))))
+            bgs = np.random.randint(0, 60, (self.N + 2, 2))
+            bgs = np.hstack((bgs, bgs + np.random.randint(20, 30, (self.N + 2, 2))))
             bgs = bgs.astype(np.float32)
             rois = np.vstack((rois, bgs))
             self.rois = rois
+            print (rois)
+            print (self.gt_boxes)
             labels, bbox_targets, bbox_inside_weights = \
                     roi_encoder(self.gt_boxes, self.rois, self.num_classes)
             self.labels = labels.eval()
@@ -125,9 +127,9 @@ class roi_test(layer_test):
             self.bbox_inside_weights = bbox_inside_weights.eval()
 
             print (self.labels.shape)
+            print (self.labels)
             print (self.bbox_targets.shape)
             print (self.bbox_inside_weights.shape)
-            print (self.gt_boxes)
             print ('learning targets:')
             for i in range(self.labels.size):
                 s = int(4 * self.labels[i])
@@ -160,8 +162,8 @@ class mask_test(layer_test):
             rois = self.gt_boxes[:, :4]
             rois = rois + np.random.randint(-5, 5, (self.N, 4))
             rois[rois < 0] = 0
-            bgs = np.random.randint(0, 60, (self.N, 2))
-            bgs = np.hstack((bgs, bgs + np.random.randint(20, 30, (self.N, 2))))
+            bgs = np.random.randint(0, 60, (self.N + 2, 2))
+            bgs = np.hstack((bgs, bgs + np.random.randint(20, 30, (self.N + 2, 2))))
             bgs = bgs.astype(np.float32)
             rois = np.vstack((rois, bgs))
             print (rois)
@@ -239,17 +241,23 @@ if __name__ == '__main__':
     print ('##############################')
     print ('Anchor Test')
     print ('##############################')
-    an_test = anchor_test(10, 5, 100, 100)
+    an_test = anchor_test(0, 5, 100, 100)
+    an_test.test()
+    an_test = anchor_test(5, 5, 100, 100)
     an_test.test()
     print ('##############################')
     print ('ROI Test')
     print ('##############################')
     r_test  = roi_test(10, 9, 100, 100)
     r_test.test()
+    r_test  = roi_test(0, 9, 100, 100)
+    r_test.test()
     print ('##############################')
     print ('Mask Test')
     print ('##############################')
     m_test  = mask_test(5, 4, 100, 100)
+    m_test.test()
+    m_test  = mask_test(0, 4, 100, 100)
     m_test.test()
     print ('##############################')
     print ('Sample Test')

@@ -11,6 +11,8 @@ from libs.boxes.anchor import anchors_plane
 from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
+_DEBUG = True
+
 def encode(gt_boxes, all_anchors, height, width, stride):
   """Matching and Encoding groundtruth into learning targets
   Sampling
@@ -43,7 +45,7 @@ def encode(gt_boxes, all_anchors, height, width, stride):
     (all_anchors[:, 3] < (height * stride) + border))[0]
   anchors = all_anchors[inds_inside, :]
   total_anchors = all_anchors.shape[0]
-  
+
   # choose boxes to assign to this stride
   # TODO gt assignment outside
   if False:
@@ -60,32 +62,40 @@ def encode(gt_boxes, all_anchors, height, width, stride):
       return labels, bbox_targets, bbox_inside_weights
 
   labels = np.zeros((anchors.shape[0], ), dtype=np.float32)
-  overlaps = cython_bbox.bbox_overlaps(
-    np.ascontiguousarray(anchors, dtype=np.float),
-    np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
 
-  gt_assignment = overlaps.argmax(axis=1)  # (A)
-  max_overlaps = overlaps[np.arange(len(inds_inside)), gt_assignment]
-  gt_argmax_overlaps = overlaps.argmax(axis=0)  # G
-  gt_max_overlaps = overlaps[gt_argmax_overlaps,
-                             np.arange(overlaps.shape[1])]
-  
-  if False:
-    # this is sentive to boxes of little overlaps, no need!
-    gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
+  if gt_boxes.size > 0:
+      overlaps = cython_bbox.bbox_overlaps(
+                 np.ascontiguousarray(anchors, dtype=np.float),
+                 np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
 
-  # fg label: for each gt, assign anchor with highest overlap despite its overlaps
-  labels[gt_argmax_overlaps] = 1
-  # fg label: above threshold IOU
-  labels[max_overlaps >= cfg.FLAGS.fg_threshold] = 1
-  # print (np.min(labels), np.max(labels))
+      if _DEBUG:
+          print (overlaps.shape)
+          print (gt_boxes.shape)
+      gt_assignment = overlaps.argmax(axis=1)  # (A)
+      max_overlaps = overlaps[np.arange(len(inds_inside)), gt_assignment]
+      gt_argmax_overlaps = overlaps.argmax(axis=0)  # G
+      gt_max_overlaps = overlaps[gt_argmax_overlaps,
+                                 np.arange(overlaps.shape[1])]
+      
+      if False:
+        # this is sentive to boxes of little overlaps, no need!
+        gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
 
-  # subsample positive labels if there are too many
-  num_fg = int(cfg.FLAGS.fg_rpn_fraction * cfg.FLAGS.rpn_batch_size)
-  fg_inds = np.where(labels == 1)[0]
-  if len(fg_inds) > num_fg:
-    disable_inds = np.random.choice(fg_inds, size=(len(fg_inds) - num_fg), replace=False)
-    labels[disable_inds] = -1
+      # fg label: for each gt, assign anchor with highest overlap despite its overlaps
+      labels[gt_argmax_overlaps] = 1
+      # fg label: above threshold IOU
+      labels[max_overlaps >= cfg.FLAGS.fg_threshold] = 1
+      # print (np.min(labels), np.max(labels))
+
+      # subsample positive labels if there are too many
+      num_fg = int(cfg.FLAGS.fg_rpn_fraction * cfg.FLAGS.rpn_batch_size)
+      fg_inds = np.where(labels == 1)[0]
+      if len(fg_inds) > num_fg:
+        disable_inds = np.random.choice(fg_inds, size=(len(fg_inds) - num_fg), replace=False)
+        labels[disable_inds] = -1
+  else:
+      # if there is no gt
+      labels[:] = 0
 
   # TODO: mild hard negative mining
   # subsample negative labels if there are too many
@@ -96,7 +106,8 @@ def encode(gt_boxes, all_anchors, height, width, stride):
     labels[disable_inds] = -1
 
   bbox_targets = np.zeros((len(inds_inside), 4), dtype=np.float32)
-  bbox_targets = _compute_targets(anchors, gt_boxes[gt_assignment, :])
+  if gt_boxes.size > 0:
+    bbox_targets = _compute_targets(anchors, gt_boxes[gt_assignment, :])
   bbox_inside_weights = np.zeros((len(inds_inside), 4), dtype=np.float32)
   bbox_inside_weights[labels == 1, :] = 1
 
