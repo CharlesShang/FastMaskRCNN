@@ -11,7 +11,7 @@ from libs.boxes.anchor import anchors_plane
 from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
-_DEBUG = True
+_DEBUG = False
 
 def encode(gt_boxes, all_anchors, height, width, stride):
   """Matching and Encoding groundtruth into learning targets
@@ -27,7 +27,6 @@ def encode(gt_boxes, all_anchors, height, width, stride):
   Returns
   --------
   labels:   Nx1 array in [0, num_classes]
-  anchors:  Sampled anchors
   bbox_targets: N x (4) regression targets
   bbox_inside_weights: N x (4), in {0, 1} indicating to which class is assigned.
   """
@@ -69,8 +68,10 @@ def encode(gt_boxes, all_anchors, height, width, stride):
                  np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
 
       if _DEBUG:
-          print (overlaps.shape)
-          print (gt_boxes.shape)
+          print ('gt_boxes shape: ', gt_boxes.shape)
+          print ('anchors shape: ', anchors.shape)
+          print ('overlaps shape: ', overlaps.shape)
+
       gt_assignment = overlaps.argmax(axis=1)  # (A)
       max_overlaps = overlaps[np.arange(len(inds_inside)), gt_assignment]
       gt_argmax_overlaps = overlaps.argmax(axis=0)  # G

@@ -10,7 +10,7 @@ import libs.configs.config_v1 as cfg
 from libs.logs.log import LOG
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 
-_DEBUG = True
+_DEBUG = False 
 def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   """Encode masks groundtruth into learnable targets
   Sample some exmaples
