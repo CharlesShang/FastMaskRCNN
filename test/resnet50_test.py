@@ -93,23 +93,10 @@ with tf.Graph().as_default():
   sess.run(init_op)
   tf.train.start_queue_runners(sess=sess)
   ## training loop
-  # with sess.as_default():
-  #   npimage = image.eval()
-  #   npih = ih.eval()
-  #   npiw = iw.eval()
-  #   npnum_instances = num_instances.eval()
-  #   npgt_masks = gt_masks.eval()
-  #   npgt_boxes = gt_boxes.eval()
-  #
-  #   print(img_id.eval())
-  #
-  #   # print(npimage)
-  #   print(npgt_boxes)
-  #   print(npih, npiw, npnum_instances)
 
   with sess.as_default():  
     for i in range(FLAGS.max_iters):
       start_time = time.time()
       sess.run(update_op)
       duration_time = time.time() - start_time
-      print ('iter %d: image-id:%07d, speed:%.3f(spf)' %(i, img_id.eval(), duration_time))
+      print ('iter %d: image-id:%07d, time:%.3f(sec)' %(i, img_id.eval(), duration_time))
