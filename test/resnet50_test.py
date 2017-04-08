@@ -5,12 +5,14 @@ from __future__ import division
 from __future__ import print_function
 import functools
 import os, sys
+import time
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import libs.configs.config_v1 as cfg
 import libs.datasets.coco as coco
+import libs.preprocessings.coco_v1 as coco_preprocess
 import libs.nets.resnet_v1 as resnet_v1
 from libs.nets.train_utils import _configure_learning_rate, _configure_optimizer, \
   _get_variables_to_train, _get_init_fn
@@ -26,7 +28,7 @@ with tf.Graph().as_default():
   ## data
   image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = \
     coco.read('./data/coco/records/coco_train2014_00000-of-00040.tfrecord')
-  image = tf.cast(image[tf.newaxis, :, :, :], tf.float32)
+  image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training=True)
   
   ##  network
   logits, end_points = resnet50(image, 1000, is_training=False)
@@ -107,5 +109,7 @@ with tf.Graph().as_default():
 
   with sess.as_default():  
     for i in range(FLAGS.max_iters):
+      start_time = time.time()
       sess.run(update_op)
-      print ('iter %d' %(i))
+      duration_time = time.time() - start_time
+      print ('iter %d: image-id:%07d, speed:%.3f(spf)' %(i, img_id.eval(), duration_time))
