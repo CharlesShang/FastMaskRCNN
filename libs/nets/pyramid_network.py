@@ -103,14 +103,17 @@ def build_pyramid(net_name, end_points, bilinear=True):
       for c in range(4, 1, -1):
         s, s_ = pyramid['P%d'%(c+1)], end_points[convs_map['C%d' % (c)]]
 
-        s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
+        # s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
         
         up_shape = tf.shape(s_)
         # out_shape = tf.stack((up_shape[1], up_shape[2]))
         # s = slim.conv2d(s, 256, [3, 3], stride=1, scope='C%d'%c)
         s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='C%d/upscale'%c)
+        s_ = slim.conv2d(s_, 256, [1,1], stride=1, scope='C%d'%c)
         
         s = tf.add(s, s_, name='C%d/addition'%c)
+        s = slim.conv2d(s, 256, [3,3], stride=1, scope='C%d/fusion'%c)
+        
         pyramid['P%d'%(c)] = s
       
       return pyramid
@@ -183,7 +186,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
       m = ROIAlign(pyramid[p], rois, False, stride=2 ** i,
                    pooled_height=14, pooled_width=14)
       outputs[p]['roi']['cropped_mask'] = m
-      for i in range(4):
+      for _ in range(4):
         m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu)
       m = slim.conv2d_transpose(m, 256, [2, 2], stride=2, padding='VALID', activation_fn=tf.nn.relu)
       m = slim.conv2d(m, num_classes * 2, [1, 1], stride=1, padding='VALID', activation_fn=None)
