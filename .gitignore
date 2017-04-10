@@ -91,3 +91,6 @@ ENV/
 
 test
 data/coco   
+data/pretrained_models
+train/
+tags
