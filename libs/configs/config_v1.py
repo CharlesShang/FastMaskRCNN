@@ -9,6 +9,10 @@ tf.app.flags.DEFINE_string(
     'train_dir', './train/maskrcnn/',
     'Directory where checkpoints and event logs are written to.')
 
+tf.app.flags.DEFINE_string(
+    'pretrained_model', './data/pretrained_models/resnet_v1_50.ckpt',
+    'Path to pretrained model')
+
 tf.app.flags.DEFINE_integer(
     'num_readers', 4,
     'The number of parallel readers that read data from the dataset.')
@@ -41,7 +45,7 @@ tf.app.flags.DEFINE_float(
     'weight_decay', 0.00004, 'The weight decay on the model weights.')
 
 tf.app.flags.DEFINE_string(
-    'optimizer', 'rmsprop',
+    'optimizer', 'momentum',
     'The name of the optimizer, one of "adadelta", "adagrad", "adam",'
     '"ftrl", "momentum", "sgd" or "rmsprop".')
 
@@ -177,6 +181,11 @@ tf.app.flags.DEFINE_string(
 tf.app.flags.DEFINE_string(
     'checkpoint_exclude_scopes', None,
     'Comma-separated list of scopes of variables to exclude when restoring '
+    'from a checkpoint.')
+
+tf.app.flags.DEFINE_string(
+    'checkpoint_include_scopes', None,
+    'Comma-separated list of scopes of variables to include when restoring '
     'from a checkpoint.')
 
 tf.app.flags.DEFINE_string(
