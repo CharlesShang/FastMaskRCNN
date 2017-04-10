@@ -123,7 +123,7 @@ with tf.Graph().as_default():
       # import libs.memory_util as memory_util
       # memory_util.vlog(1)
       # with memory_util.capture_stderr() as stderr:
-      #     sess.run([update_op, total_loss])
+      #     sess.run([update_op])
       # memory_util.print_memory_timeline(stderr, ignore_less_than_bytes=1000)
       
       ## training loop

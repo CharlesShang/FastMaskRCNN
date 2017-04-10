@@ -79,6 +79,7 @@ def _filter_negative_samples(labels, tensors):
         tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0])
         f = tf.gather(t, keeps)
         filtered.append(f)
+    filtered = tensors
 
     return filtered
         
