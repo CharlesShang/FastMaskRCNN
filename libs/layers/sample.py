@@ -9,6 +9,7 @@ import libs.configs.config_v1 as cfg
 import libs.boxes.nms_wrapper as nms_wrapper
 from libs.logs.log import LOG
 
+_DEBUG=False
 
 def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   """Sample boxes according to scores and some learning strategies
@@ -41,8 +42,8 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   scores = scores[keeps]
   
   # filter with scores
-  order = scores.ravel().argsort()
-  if cfg.FLAGS.pre_nms_top_n > 0:
+  order = scores.ravel().argsort()[::-1]
+  if pre_nms_top_n > 0:
     order = order[:pre_nms_top_n]
   boxes = boxes[order, :]
   scores = scores[order]
@@ -51,13 +52,41 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   det = np.hstack((boxes, scores)).astype(np.float32)
   keeps = nms_wrapper.nms(det, rpn_nms_threshold)
   
-  if cfg.FLAGS.post_nms_top_n > 0:
+  if post_nms_top_n > 0:
     keeps = keeps[:post_nms_top_n]
   boxes = boxes[keeps, :]
   scores = scores[keeps]
-  LOG('%d rois has been choosen' % len(keeps))
+
+  if _DEBUG:
+    LOG('SAMPLE: %d rois has been choosen' % len(keeps))
+    LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
   
   return boxes, scores
+
+def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, only_positive=False):
+    """sample boxes for refined output"""
+    boxes, scores = sample_rpn_outputs(boxes, scores, is_training, only_positive)
+
+    if is_training and gt_boxes.size > 0:
+        boxes = np.vstack((boxes, _jitter_boxes(gt_boxes[:, :4])))
+        scores = np.vstack((scores, np.ones((gt_boxes.shape[0], 1), dtype=np.float32)))
+
+    return boxes, scores
+
+def _jitter_boxes(boxes, jitter=0.1):
+    """ jitter the boxes before appending them into rois
+    """
+    jittered_boxes = boxes.copy()
+    ws = jittered_boxes[:, 2] - jittered_boxes[:, 0] + 1.0
+    hs = jittered_boxes[:, 3] - jittered_boxes[:, 1] + 1.0
+    width_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * ws
+    height_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * hs
+    jittered_boxes[:, 0] += width_offset
+    jittered_boxes[:, 2] += width_offset
+    jittered_boxes[:, 1] += height_offset
+    jittered_boxes[:, 3] += height_offset
+
+    return jittered_boxes
 
 def _filter_boxes(boxes, min_size):
   """Remove all boxes with any side smaller than min_size."""
