@@ -1,3 +1,4 @@
+# coding=utf-8
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -15,6 +16,8 @@ from libs.layers import mask_decoder
 from libs.layers import gen_all_anchors
 from libs.layers import ROIAlign
 from libs.layers import sample_rpn_outputs
+from libs.layers import sample_rpn_outputs_with_gt
+from libs.layers import assign_boxes
 
 # mapping each stage to its' tensor features
 _networks_map = {
@@ -30,22 +33,26 @@ _networks_map = {
                }
 }
 
-def _extra_conv_arg_scope(weight_decay=0.00005, activation_fn=None, normalizer_fn=None):
+def _extra_conv_arg_scope(weight_decay=0.0005, activation_fn=None, normalizer_fn=None):
 
   with slim.arg_scope(
       [slim.conv2d, slim.conv2d_transpose],
       padding='SAME',
       weights_regularizer=slim.l2_regularizer(weight_decay),
-      weights_initializer=slim.variance_scaling_initializer(0.1),
+      weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
       activation_fn=activation_fn,
       normalizer_fn=normalizer_fn,) as arg_sc:
     with slim.arg_scope(
       [slim.fully_connected],
           weights_regularizer=slim.l2_regularizer(weight_decay),
-          weights_initializer=slim.variance_scaling_initializer(0.1),
+          weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
           activation_fn=activation_fn,
           normalizer_fn=normalizer_fn) as arg_sc:
           return arg_sc
+
+def my_sigmoid(x):
+    """add an active function for the box output layer, which is linear around 0"""
+    return (tf.nn.sigmoid(x) - tf.cast(0.5, tf.float32)) * 12.0
 
 def _smooth_l1_dist(x, y, sigma2=9.0, name='smooth_l1_dist'):
   """Smooth L1 loss
@@ -60,6 +67,17 @@ def _smooth_l1_dist(x, y, sigma2=9.0, name='smooth_l1_dist'):
     return tf.square(deltas) * 0.5 * sigma2 * smoothL1_sign + \
            (deltas_abs - 0.5 / sigma2) * tf.abs(smoothL1_sign - 1)
 
+def _get_valid_sample_fraction(labels):
+    """return fraction of non-negative examples, the ignored examples have been marked as negative"""
+    num_valid = tf.reduce_sum(tf.cast(tf.greater_equal(labels, 0), tf.float32))
+    num_example = tf.cast(tf.size(labels), tf.float32)
+    frac = tf.cond(tf.greater(num_example, 0), lambda:num_valid / num_example,  
+            lambda: tf.cast(0, tf.float32))
+    frac_ = tf.cond(tf.greater(num_valid, 0), lambda:num_example / num_valid, 
+            lambda: tf.cast(0, tf.float32))
+    return frac, frac_
+
+
 def _filter_negative_samples(labels, tensors):
     """keeps only samples with none-negative labels 
     Params:
@@ -71,6 +89,7 @@ def _filter_negative_samples(labels, tensors):
     -----
     tensors: filtered tensors
     """
+    # return tensors
     keeps = tf.where(tf.greater_equal(labels, 0))
     keeps = tf.reshape(keeps, [-1])
 
@@ -79,11 +98,29 @@ def _filter_negative_samples(labels, tensors):
         tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0])
         f = tf.gather(t, keeps)
         filtered.append(f)
-    filtered = tensors
 
     return filtered
         
-
+def _add_jittered_boxes(rois, gt_boxes, jitter=0.1):
+    ws = gt_boxes[:, 2] - gt_boxes[:, 0]
+    hs = gt_boxes[:, 3] - gt_boxes[:, 1]
+    shape = tf.shape(gt_boxes)[0]
+    jitter = tf.random_uniform([shape, 1], minval = -jitter, maxval = jitter)
+    jitter = tf.reshape(jitter, [-1])
+    ws_offset = ws * jitter
+    hs_offset = hs * jitter
+    x1s = gt_boxes[:, 0] + ws_offset
+    x2s = gt_boxes[:, 2] + ws_offset
+    y1s = gt_boxes[:, 1] + hs_offset
+    y2s = gt_boxes[:, 3] + hs_offset
+    boxes = tf.concat(
+            values=[
+                x1s[:, tf.newaxis],
+                y1s[:, tf.newaxis],
+                x2s[:, tf.newaxis],
+                y2s[:, tf.newaxis]],
+            axis=1)
+    return tf.concat(values=[rois, boxes], axis=0)
 
 def build_pyramid(net_name, end_points, bilinear=True):
   """build pyramid features from a typical network,
@@ -134,6 +171,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
   """
   outputs = {}
   arg_scope = _extra_conv_arg_scope(activation_fn=None)
+  # my_sigmoid = None
   with slim.arg_scope(arg_scope):
     with tf.variable_scope('pyramid'):
         # for p in pyramid:
@@ -146,8 +184,10 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
           shape = tf.shape(pyramid[p])
           height, width = shape[1], shape[2]
           rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='%s/rpn'%p)
-          box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p)
-          cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p)
+          box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p, \
+                  weights_initializer=tf.truncated_normal_initializer(stddev=0.001), activation_fn=my_sigmoid)
+          cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
+                  weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
           outputs[p]['rpn'] = {'box': box, 'cls': cls}
           
           ## decode, sample and crop
@@ -159,6 +199,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
           rois, classes, scores = \
                     anchor_decoder(box, cls_prob, all_anchors, ih, iw)
           rois, scores = sample_rpn_outputs(rois, scores)
+          # rois, scores = sample_rpn_outputs_with_gt(rois, scores, gt_boxes, is_training)
           cropped = ROIAlign(pyramid[p], rois, False, stride=2**i,
                              pooled_height=7, pooled_width=7,)
 
@@ -171,8 +212,10 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
           refine = slim.dropout(refine, keep_prob=0.75, is_training=is_training)
           refine = slim.fully_connected(refine,  1024, activation_fn=tf.nn.relu)
           refine = slim.dropout(refine, keep_prob=0.75, is_training=is_training)
-          cls2 = slim.fully_connected(refine, num_classes, activation_fn=None)
-          box = slim.fully_connected(refine, num_classes*4, activation_fn=None)
+          cls2 = slim.fully_connected(refine, num_classes, activation_fn=None, 
+                  weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
+          box = slim.fully_connected(refine, num_classes*4, activation_fn=my_sigmoid, 
+                  weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
           outputs[p]['refined'] = {'box': box, 'cls': cls2}
           
           ## decode refine net outputs
@@ -191,7 +234,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
           for _ in range(4):
             m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu)
           m = slim.conv2d_transpose(m, 256, [2, 2], stride=2, padding='VALID', activation_fn=tf.nn.relu)
-          m = slim.conv2d(m, num_classes * 2, [1, 1], stride=1, padding='VALID', activation_fn=None)
+          m = slim.conv2d(m, num_classes, [1, 1], stride=1, padding='VALID', activation_fn=None)
           
           # add a mask, given the predicted boxes and classes
           outputs[p]['mask'] = {'mask':m, 'classes': classes, 'scores': scores}
@@ -208,21 +251,44 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
   ------
   outputs: output of build_heads
   gt_boxes: A tensor of shape (G, 5), [x1, y1, x2, y2, class]
-  gt_masks: A tensor of shape (G, ih, iw),  {0, 1}
+  gt_masks: A tensor of shape (G, ih, iw),  {0, 1}Ì[MaÌ[MaÌ]]
   *_lw: loss weight of rpn, refined and mask losses
   
   Returns:
   -------
   l: a loss tensor
   """
+
+  # losses for pyramid
+  losses = []
+  rpn_box_losses, rpn_cls_losses = [], []
+  refined_box_losses, refined_cls_losses = [], []
+  mask_losses = []
+  
+  # watch some info during training
+  rpn_batch = []
+  refine_batch = []
+  mask_batch = []
+  rpn_batch_pos = []
+  refine_batch_pos = []
+  mask_batch_pos = []
+
   arg_scope = _extra_conv_arg_scope(activation_fn=None)
   with slim.arg_scope(arg_scope):
       with tf.variable_scope('pyramid'):
+
+          ## assigning gt_boxes
+          assigned_gt_boxes = assign_boxes(gt_boxes, [2, 3, 4, 5])
+          assigned_layer_inds = assigned_gt_boxes[-1]
+
+          ## build losses for PFN
           for i in range(5, 1, -1):
             p = 'P%d' % i
             stride = 2 ** i
             shape = tf.shape(pyramid[p])
             height, width = shape[1], shape[2]
+
+            gt_boxes = assigned_gt_boxes[i-2]
             
             ### rpn losses
             # 1. encode ground truth
@@ -241,24 +307,40 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
                         tf.reshape(bbox_targets, [-1, 4]),
                         tf.reshape(bbox_inside_weights, [-1, 4])
                         ])
+            _, frac_ = _get_valid_sample_fraction(labels)
+            rpn_batch.append(
+                    tf.reduce_sum(tf.cast(
+                        tf.greater_equal(labels, 0), tf.float32
+                        )))
+            rpn_batch_pos.append(
+                    tf.reduce_sum(tf.cast(
+                        tf.greater_equal(labels, 1), tf.float32
+                        )))
             rpn_box_loss = bbox_inside_weights * _smooth_l1_dist(boxes, bbox_targets)
             rpn_box_loss = tf.reshape(rpn_box_loss, [-1, 4])
             rpn_box_loss = tf.reduce_sum(rpn_box_loss, axis=1)
-            rpn_box_loss = rpn_box_lw * tf.reduce_mean(rpn_box_loss)
+            rpn_box_loss = rpn_box_lw * tf.reduce_mean(rpn_box_loss) 
             tf.add_to_collection(tf.GraphKeys.LOSSES, rpn_box_loss)
+            rpn_box_losses.append(rpn_box_loss)
 
             # NOTE: examples with negative labels are ignore when compute one_hot_encoding and entropy losses 
             # BUT these examples still count when computing the average of softmax_cross_entropy, 
             # the loss become smaller by a factor (None_negtive_labels / all_labels)
             # So the BEST practise still should be gathering all none-negative examples
             labels = slim.one_hot_encoding(labels, 2, on_value=1.0, off_value=0.0) # this will set -1 label to all zeros
-            rpn_cls_loss = rpn_cls_lw * tf.losses.softmax_cross_entropy(labels, classes)
+            rpn_cls_loss = rpn_cls_lw * tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=classes) 
+            rpn_cls_loss = tf.reduce_mean(rpn_cls_loss) 
+            tf.add_to_collection(tf.GraphKeys.LOSSES, rpn_cls_loss)
+            rpn_cls_losses.append(rpn_cls_loss)
             
 
             ### refined loss
             # 1. encode ground truth
             # 2. compute distances
             rois = outputs[p]['roi']['box']
+            rois = _add_jittered_boxes(rois, gt_boxes)
+            rois = _add_jittered_boxes(rois, gt_boxes, jitter=0.2)
+            rois = _add_jittered_boxes(rois, gt_boxes, jitter=0.4)
             
             boxes = outputs[p]['refined']['box']
             classes = outputs[p]['refined']['cls']
@@ -273,21 +355,35 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
                         tf.reshape(bbox_targets, [-1, num_classes * 4]),
                         tf.reshape(bbox_inside_weights, [-1, num_classes * 4])
                         ] )
+            frac, frac_ = _get_valid_sample_fraction(labels)
+            refine_batch.append(
+                    tf.reduce_sum(tf.cast(
+                        tf.greater_equal(labels, 0), tf.float32
+                        )))
+            refine_batch_pos.append(
+                    tf.reduce_sum(tf.cast(
+                        tf.greater_equal(labels, 1), tf.float32
+                        )))
+
             refined_box_loss = bbox_inside_weights * _smooth_l1_dist(boxes, bbox_targets)
             refined_box_loss = tf.reshape(refined_box_loss, [-1, 4])
             refined_box_loss = tf.reduce_sum(refined_box_loss, axis=1)
-            refined_box_loss = refined_box_lw * tf.reduce_mean(refined_box_loss)
+            refined_box_loss = refined_box_lw * tf.reduce_mean(refined_box_loss) * frac_
             tf.add_to_collection(tf.GraphKeys.LOSSES, refined_box_loss)
+            refined_box_losses.append(refined_box_loss)
 
             labels = slim.one_hot_encoding(labels, num_classes, on_value=1.0, off_value=0.0)
-            refined_cls_loss = refined_cls_lw * tf.losses.softmax_cross_entropy(classes, labels)
+            refined_cls_loss = refined_cls_lw * tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=classes) 
+            refined_cls_loss = tf.reduce_mean(refined_cls_loss) * frac_
+            tf.add_to_collection(tf.GraphKeys.LOSSES, refined_cls_loss)
+            refined_cls_losses.append(refined_cls_loss)
 
             ### mask loss
             # mask of shape (N, h, w, num_classes*2)
             masks = outputs[p]['mask']['mask']
-            mask_shape = tf.shape(masks)
-            masks = tf.reshape(masks, (mask_shape[0], mask_shape[1],
-                                       mask_shape[2], tf.cast(mask_shape[3]/2, tf.int32), 2))
+            # mask_shape = tf.shape(masks)
+            # masks = tf.reshape(masks, (mask_shape[0], mask_shape[1],
+            #                            mask_shape[2], tf.cast(mask_shape[3]/2, tf.int32), 2))
             labels, mask_targets, mask_inside_weights = \
               mask_encoder(gt_masks, gt_boxes, rois, num_classes, 28, 28, scope='MaskEncoder')
             labels, masks, mask_targets, mask_inside_weights = \
@@ -297,8 +393,40 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
                         mask_targets, 
                         mask_inside_weights, 
                         ])
-            mask_targets = slim.one_hot_encoding(mask_targets, 2, on_value=1.0, off_value=0.0)
-            mask_binary_loss = mask_lw * tf.losses.softmax_cross_entropy(masks, mask_targets)
-            
+            _, frac_ = _get_valid_sample_fraction(labels)
+            mask_batch.append(
+                    tf.reduce_sum(tf.cast(
+                        tf.greater_equal(labels, 0), tf.float32
+                        )))
+            mask_batch_pos.append(
+                    tf.reduce_sum(tf.cast(
+                        tf.greater_equal(labels, 1), tf.float32
+                        )))
+            # mask_targets = slim.one_hot_encoding(mask_targets, 2, on_value=1.0, off_value=0.0)
+            # mask_binary_loss = mask_lw * tf.losses.softmax_cross_entropy(mask_targets, masks)
+            # NOTE: w/o competition between classes. 
+            mask_targets = tf.cast(mask_targets, tf.float32)
+            mask_loss = mask_lw * tf.nn.sigmoid_cross_entropy_with_logits(labels=mask_targets, logits=masks) 
+            mask_loss = tf.reduce_mean(mask_loss) 
+            mask_loss = tf.cond(tf.greater(tf.size(labels), 0), lambda: mask_loss, lambda: tf.constant(0.0))
+            tf.add_to_collection(tf.GraphKeys.LOSSES, mask_loss)
+            mask_losses.append(mask_loss)
+
+  rpn_box_losses = tf.add_n(rpn_box_losses)
+  rpn_cls_losses = tf.add_n(rpn_cls_losses)
+  refined_box_losses = tf.add_n(refined_box_losses)
+  refined_cls_losses = tf.add_n(refined_cls_losses)
+  mask_losses = tf.add_n(mask_losses)
+  losses = [rpn_box_losses, rpn_cls_losses, refined_box_losses, refined_cls_losses, mask_losses]
+  total_loss = tf.add_n(losses)
+
+  rpn_batch = tf.cast(tf.add_n(rpn_batch), tf.float32)
+  refine_batch = tf.cast(tf.add_n(refine_batch), tf.float32)
+  mask_batch = tf.cast(tf.add_n(mask_batch), tf.float32)
+  rpn_batch_pos = tf.cast(tf.add_n(rpn_batch_pos), tf.float32)
+  refine_batch_pos = tf.cast(tf.add_n(refine_batch_pos), tf.float32)
+  mask_batch_pos = tf.cast(tf.add_n(mask_batch_pos), tf.float32)
     
-  return rpn_box_loss + rpn_cls_loss + refined_box_loss + refined_cls_loss + mask_binary_loss
+  return total_loss, losses, [rpn_batch_pos, rpn_batch, \
+                              refine_batch_pos, refine_batch, \
+                              mask_batch_pos, mask_batch]
