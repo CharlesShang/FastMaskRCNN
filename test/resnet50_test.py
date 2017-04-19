@@ -38,7 +38,7 @@ with tf.Graph().as_default():
       image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training=True)
       
       ##  network
-      with slim.arg_scope(resnet_v1.resnet_arg_scope()):
+      with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.00001)):
         logits, end_points = resnet50(image, 1000, is_training=False)
       end_points['inputs'] = image
       
@@ -58,9 +58,12 @@ with tf.Graph().as_default():
       
       
       ## losses
-      outputs = pyramid_network.build_losses(pyramid, outputs,
+      loss, losses, batch_info = pyramid_network.build_losses(pyramid, outputs,
                                              gt_boxes, gt_masks,
-                                             num_classes=81, base_anchors=15)
+                                             num_classes=81, base_anchors=15, 
+                                             rpn_box_lw =1.0, rpn_cls_lw = 0.2,
+                                             refined_box_lw=5.0, refined_cls_lw=0.1,
+                                             mask_lw=0.2)
 
       ## optimization
       learning_rate = _configure_learning_rate(82783, global_step)
@@ -72,7 +75,9 @@ with tf.Graph().as_default():
       loss = tf.get_collection(tf.GraphKeys.LOSSES)
       regular_loss = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
       total_loss = tf.add_n(loss + regular_loss)
+      reg_loss = tf.add_n(regular_loss)
       summaries.add(tf.summary.scalar('total_loss', total_loss))
+      summaries.add(tf.summary.scalar('regular_loss', reg_loss))
       
       variables_to_train = _get_variables_to_train()
       update_op = optimizer.minimize(total_loss)
@@ -131,22 +136,37 @@ with tf.Graph().as_default():
       # with sess.as_default():  
       for step in range(FLAGS.max_iters):
         start_time = time.time()
-        # summary_str, _, tot_loss = \
-        #             sess.run([summary_op, update_op, total_loss])
-        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-        run_metadata = tf.RunMetadata()
-        sess.run([update_op, total_loss], 
-                            options=run_options, 
-                            run_metadata=run_metadata)
-        # tot_loss = sess.run(update_op)
-        duration_time = time.time() - start_time
-        if step % 10 == 0: 
-          print ('iter %d: image-id:%07d, time:%.3f(sec)' %(step, 0, duration_time))
-        # if step % 100 == 0:
-        #   summary_str = sess.run([summary_op], options=run_options, run_metadata=run_metadata)
-        #   summary_writer.add_summary(summary_str, step)
+        
+        _, tot_loss, reg_lossnp, img_id_str, \
+        rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss, \
+        gt_boxesnp, \
+        rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch = \
+                     sess.run([update_op, total_loss, reg_loss,  img_id] + 
+                              losses + 
+                              [gt_boxes] + 
+                              batch_info)
+      # TODO: sampling strategy
 
-        if (step % 10000 == 0 or step + 1 == FLAGS.max_iters) and step != 0:
+        duration_time = time.time() - start_time
+        if step % 1 == 0: 
+            print ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
+                    """total-loss %.4f(%.4f, %.4f, %.6f, %.4f, %.4f), """
+                    """instances: %d, """
+                    """batch:(%d|%d, %d|%d, %d|%d)""" 
+                   % (step, img_id_str, duration_time, reg_lossnp, 
+                      tot_loss, rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss,
+                      gt_boxesnp.shape[0], 
+                      rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch))
+
+            if np.isnan(tot_loss) or np.isinf(tot_loss):
+                print (gt_boxesnp)
+                raise
+          
+        if step % 100 == 0:
+           summary_str = sess.run(summary_op)
+           summary_writer.add_summary(summary_str, step)
+
+        if (step % 1000 == 0 or step + 1 == FLAGS.max_iters) and step != 0:
           checkpoint_path = os.path.join(FLAGS.train_dir, 
                                          FLAGS.dataset_name + '_model.ckpt')
           saver.save(sess, checkpoint_path, global_step=step)
