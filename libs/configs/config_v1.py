@@ -81,12 +81,12 @@ tf.app.flags.DEFINE_float(
     'ftrl_l2', 0.0, 'The FTRL l2 regularization strength.')
 
 tf.app.flags.DEFINE_float(
-    'momentum', 0.9,
+    'momentum', 0.99,
     'The momentum for the MomentumOptimizer and RMSPropOptimizer.')
 
-tf.app.flags.DEFINE_float('rmsprop_momentum', 0.9, 'Momentum.')
+tf.app.flags.DEFINE_float('rmsprop_momentum', 0.99, 'Momentum.')
 
-tf.app.flags.DEFINE_float('rmsprop_decay', 0.9, 'Decay term for RMSProp.')
+tf.app.flags.DEFINE_float('rmsprop_decay', 0.99, 'Decay term for RMSProp.')
 
 #######################
 # Learning Rate Flags #
@@ -167,7 +167,7 @@ tf.app.flags.DEFINE_string(
     'The classes to classify.')
 
 tf.app.flags.DEFINE_integer(
-    'image_min_size', 600,
+    'image_min_size', 640,
     'resize image so that the min edge equals to image_min_size')
 
 #####################
@@ -202,7 +202,7 @@ tf.app.flags.DEFINE_boolean(
 #######################
 
 tf.app.flags.DEFINE_float(
-    'fg_threshold', 0.7,
+    'fg_threshold', 0.5,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
@@ -210,7 +210,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
-    'rois_per_image', 128,
+    'rois_per_image', 64,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
@@ -238,7 +238,7 @@ tf.app.flags.DEFINE_integer(
     'Number of rpn anchors that should be sampled before nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_top_n', 256,
+    'post_nms_top_n', 128,
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_float(
