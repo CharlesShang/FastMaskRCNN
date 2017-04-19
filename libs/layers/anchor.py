@@ -11,7 +11,7 @@ from libs.boxes.anchor import anchors_plane
 from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
-_DEBUG = False
+_DEBUG = True
 
 def encode(gt_boxes, all_anchors, height, width, stride):
   """Matching and Encoding groundtruth into learning targets
@@ -45,21 +45,6 @@ def encode(gt_boxes, all_anchors, height, width, stride):
   anchors = all_anchors[inds_inside, :]
   total_anchors = all_anchors.shape[0]
 
-  # choose boxes to assign to this stride
-  # TODO gt assignment outside
-  if False:
-    areas = (gt_boxes[:, 3] - gt_boxes[:, 1] + 1) * (gt_boxes[:, 2] - gt_boxes[:, 0] + 1)
-    ks = np.floor(4 + np.log2(np.sqrt(areas) / 224.0))
-    K = int(np.log2(stride))
-    inds = np.where((K == ks + 4))[0]
-    if inds.size > 0:
-      gt_boxes = gt_boxes[inds]
-    else:
-      labels = np.zeros((total_anchors), dtype=np.float32)
-      bbox_targets = np.zeros((total_anchors, 4), dtype=np.float32)
-      bbox_inside_weights = np.zeros((total_anchors, 4), dtype=np.float32)
-      return labels, bbox_targets, bbox_inside_weights
-
   labels = np.zeros((anchors.shape[0], ), dtype=np.float32)
 
   if gt_boxes.size > 0:
@@ -67,10 +52,10 @@ def encode(gt_boxes, all_anchors, height, width, stride):
                  np.ascontiguousarray(anchors, dtype=np.float),
                  np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
 
-      if _DEBUG:
-          print ('gt_boxes shape: ', gt_boxes.shape)
-          print ('anchors shape: ', anchors.shape)
-          print ('overlaps shape: ', overlaps.shape)
+      # if _DEBUG:
+      #     print ('gt_boxes shape: ', gt_boxes.shape)
+      #     print ('anchors shape: ', anchors.shape)
+      #     print ('overlaps shape: ', overlaps.shape)
 
       gt_assignment = overlaps.argmax(axis=1)  # (A)
       max_overlaps = overlaps[np.arange(len(inds_inside)), gt_assignment]
@@ -80,10 +65,29 @@ def encode(gt_boxes, all_anchors, height, width, stride):
       
       if True:
         # this is sentive to boxes of little overlaps, no need!
-        gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
+        # gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
 
-        # fg label: for each gt, assign anchor with highest overlap despite its overlaps
+        # fg label: for each gt, hard-assign anchor with highest overlap despite its overlaps
         labels[gt_argmax_overlaps] = 1
+
+        # exclude examples with little overlaps
+        # added later
+        excludes = np.where(gt_max_overlaps < cfg.FLAGS.bg_threshold)[0]
+        labels[gt_argmax_overlaps[excludes]] = -1
+
+        if _DEBUG:
+           min_ov = np.min(gt_max_overlaps)
+           max_ov = np.max(gt_max_overlaps)
+           mean_ov = np.mean(gt_max_overlaps)
+           if min_ov < cfg.FLAGS.bg_threshold:
+               LOG('ANCHOREncoder: overlaps: (min %.3f mean:%.3f max:%.3f), stride: %d, shape:(h:%d, w:%d)' 
+                       % (min_ov, mean_ov, max_ov, stride, height, width))
+               worst = gt_boxes[np.argmin(gt_max_overlaps)]
+               anc = anchors[gt_argmax_overlaps[np.argmin(gt_max_overlaps)], :]
+               LOG('ANCHOREncoder: worst case: overlap: %.3f, box:(%.1f, %.1f, %.1f, %.1f %d), anchor:(%.1f, %.1f, %.1f, %.1f)'
+                       % (min_ov, worst[0], worst[1], worst[2], worst[3], worst[4],
+                          anc[0], anc[1], anc[2], anc[3]))
+           
 
       # fg label: above threshold IOU
       labels[max_overlaps >= cfg.FLAGS.fg_threshold] = 1
