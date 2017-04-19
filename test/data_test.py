@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# make sure the tfrecords are correctly generated.
 
 from __future__ import absolute_import
 from __future__ import division
