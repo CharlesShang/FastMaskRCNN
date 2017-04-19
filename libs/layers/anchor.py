@@ -78,12 +78,13 @@ def encode(gt_boxes, all_anchors, height, width, stride):
       gt_max_overlaps = overlaps[gt_argmax_overlaps,
                                  np.arange(overlaps.shape[1])]
       
-      if False:
+      if True:
         # this is sentive to boxes of little overlaps, no need!
         gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
 
-      # fg label: for each gt, assign anchor with highest overlap despite its overlaps
-      labels[gt_argmax_overlaps] = 1
+        # fg label: for each gt, assign anchor with highest overlap despite its overlaps
+        labels[gt_argmax_overlaps] = 1
+
       # fg label: above threshold IOU
       labels[max_overlaps >= cfg.FLAGS.fg_threshold] = 1
       # print (np.min(labels), np.max(labels))
@@ -100,7 +101,8 @@ def encode(gt_boxes, all_anchors, height, width, stride):
 
   # TODO: mild hard negative mining
   # subsample negative labels if there are too many
-  num_bg = cfg.FLAGS.rpn_batch_size - np.sum(labels == 1)
+  num_fg = np.sum(labels == 1)
+  num_bg = max(min(cfg.FLAGS.rpn_batch_size - num_fg, num_fg * 3), 8)
   bg_inds = np.where(labels == 0)[0]
   if len(bg_inds) > num_bg:
     disable_inds = np.random.choice(bg_inds, size=(len(bg_inds) - num_bg), replace=False)
