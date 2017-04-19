@@ -52,6 +52,12 @@ def preprocess_for_training(image, gt_boxes, gt_masks):
     scale_ratio = tf.to_float(new_ih) / tf.to_float(ih)
     gt_boxes = preprocess_utils.resize_gt_boxes(gt_boxes, scale_ratio)
 
+    ## random flip image
+    # val_lr = tf.to_float(tf.random_uniform([1]))[0]
+    # image = tf.cond(val_lr > 0.5, lambda: preprocess_utils.flip_image(image), lambda: image)
+    # gt_masks = tf.cond(val_lr > 0.5, lambda: preprocess_utils.flip_gt_masks(gt_masks), lambda: gt_masks)
+    # gt_boxes = tf.cond(val_lr > 0.5, lambda: preprocess_utils.flip_gt_boxes(gt_boxes, new_ih, new_iw), lambda: gt_boxes)
+
     ## zero mean image
     image = tf.cast(image, tf.float32)
     image = image / 256.0
