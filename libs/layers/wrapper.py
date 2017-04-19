@@ -121,6 +121,19 @@ def sample_wrapper(boxes, scores, is_training=False, scope='SampleBoxes'):
   
   return boxes, scores
 
+def sample_with_gt_wrapper(boxes, scores, gt_boxes, is_training=False, scope='SampleBoxesWithGT'):
+  
+  with tf.name_scope(scope) as sc:
+    boxes, scores = \
+      tf.py_func(sample.sample_rpn_outputs_wrt_gt_boxes,
+                 [boxes, scores, gt_boxes, is_training],
+                 [tf.float32, tf.float32])
+    boxes = tf.convert_to_tensor(boxes, name='Boxes')
+    scores = tf.convert_to_tensor(scores, name='Scores')
+    boxes = tf.reshape(boxes, (-1, 4))
+  
+  return boxes, scores
+
 def gen_all_anchors(height, width, stride, scope='GenAnchors'):
   
   with tf.name_scope(scope) as sc:
