@@ -11,6 +11,7 @@ from . import anchor
 from . import roi
 from . import mask
 from . import sample
+from . import assign
 from libs.boxes.anchor import anchors_plane
 
 def anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEncoder'):
@@ -132,4 +133,22 @@ def gen_all_anchors(height, width, stride, scope='GenAnchors'):
     all_anchors = tf.reshape(all_anchors, (height, width, -1))
     
     return all_anchors
-    
+
+def assign_boxes(gt_boxes, layers, scope='AssignGTBoxes'):
+
+    with tf.name_scope(scope) as sc:
+        min_k = layers[0]
+        max_k = layers[-1]
+        assigned_layers = \
+            tf.py_func(assign.assign_boxes, 
+                     [ gt_boxes, min_k, max_k ],
+                     tf.int32)
+        assigned_layers = tf.reshape(assigned_layers, [-1])
+        assigned_gt_boxes = []
+        for t in layers:
+            t = tf.cast(t, tf.int32)
+            inds = tf.where(tf.equal(assigned_layers, t))
+            inds = tf.reshape(inds, [-1])
+            assigned_gt_boxes.append(tf.gather(gt_boxes, inds))
+
+        return assigned_gt_boxes + [assigned_layers]

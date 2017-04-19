@@ -17,6 +17,7 @@ from libs.layers import mask_decoder
 from libs.layers import gen_all_anchors
 from libs.layers import ROIAlign
 from libs.layers import sample_rpn_outputs
+from libs.layers import assign_boxes
 import  libs.configs.config_v1 as cfg
 
 class layer_test(object):
@@ -236,6 +237,26 @@ class ROIAlign_test(layer_test):
             print (self.feats.shape)
             print (self.feats.reshape((self.N, pooled_height, pooled_width)))
 
+class assign_test(layer_test):
+
+    def __init__(self, N, num_classes, height, width, gt_boxes=None, gt_masks=None, rois=None, classes=None):
+        super(assign_test, self).__init__(N, num_classes, height, width, gt_boxes, gt_masks, rois, classes)
+    def test(self):
+
+        self.gt_boxes = np.random.randint(0, int(self.width/1.5), (self.N, 2))
+        s = np.random.randint(30, int(self.width/1), (self.N, 2))
+        c = np.random.randint(1, self.num_classes, (self.N, 1))
+        self.gt_boxes = np.hstack((self.gt_boxes, self.gt_boxes + s, c))
+        with tf.Session() as sess:
+            [b1, b2, b3, b4, inds] = assign_boxes(self.gt_boxes, 
+                    [2,3,4,5])
+            b1n, b2n, b3n, b4n, indsn = \
+                    sess.run([b1, b2, b3, b4, inds])
+            print (b1n)
+            print (b2n)
+            print (b3n)
+            print (b4n)
+            print (np.hstack((self.gt_boxes, indsn[:, np.newaxis])))
 
 if __name__ == '__main__':
     print ('##############################')
@@ -268,4 +289,9 @@ if __name__ == '__main__':
     print ('ROIAlign Test')
     print ('##############################')
     c_test  = ROIAlign_test(5, 4, 100, 100)
+    c_test.test()
+    print ('##############################')
+    print ('Assign Test')
+    print ('##############################')
+    c_test  = assign_test(15, 2, 800, 800)
     c_test.test()
