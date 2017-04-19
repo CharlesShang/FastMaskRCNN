@@ -7,16 +7,17 @@ from __future__ import print_function
 import tensorflow as tf
 
 from libs.datasets import download_and_convert_coco
+from libs.configs import config_v1
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string(
-    'dataset_name', 'coco',
-    'The name of the dataset to convert, one of "cifar10", "flowers", "mnist".')
+# tf.app.flags.DEFINE_string(
+#     'dataset_name', 'coco',
+#     'The name of the dataset to convert, one of "coco", "cifar10", "flowers", "mnist".')
 
-tf.app.flags.DEFINE_string(
-    'dataset_dir', 'data/coco',
-    'The directory where the output TFRecords and temporary files are saved.')
+# tf.app.flags.DEFINE_string(
+#     'dataset_dir', 'data/coco',
+#     'The directory where the output TFRecords and temporary files are saved.')
 
 
 def main(_):
