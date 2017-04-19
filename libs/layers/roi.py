@@ -7,6 +7,8 @@ import numpy as np
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
+from libs.logs.log import LOG 
+
 # FLAGS = tf.app.flags.FLAGS
 
 _DEBUG = False 
@@ -38,7 +40,9 @@ def encode(gt_boxes, rois, num_classes):
       # max_overlaps = overlaps.max(axis=1)      # R
       max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
       # note: this will assign every rois with a positive label 
-      labels = gt_boxes[gt_assignment, 4]
+      # labels = gt_boxes[gt_assignment, 4]
+      labels = np.zeros([num_rois], dtype=np.float32)
+      labels[:] = -1
 
       if _DEBUG:
           print ('gt_assignment')
@@ -49,19 +53,20 @@ def encode(gt_boxes, rois, num_classes):
       fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
       if fg_inds.size > 0 and fg_rois < fg_inds.size:
         fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
-      # print(fg_rois)
+      labels[fg_inds] = gt_boxes[gt_assignment[fg_inds], 4] 
       
-      bg_rois = cfg.FLAGS.rois_per_image - fg_rois
+      # TODO: sampling strategy
       bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      labels[bg_inds] = 0
-      # print(bg_rois)
+      bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 4)
       if bg_inds.size > 0 and bg_rois < bg_inds.size:
         bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
-
+      labels[bg_inds] = 0
+      
       # ignore rois with overlaps between fg_threshold and bg_threshold 
       ignore_inds = np.where(((max_overlaps > cfg.FLAGS.bg_threshold) &\
               (max_overlaps < cfg.FLAGS.fg_threshold)))[0]
       labels[ignore_inds] = -1 
+
       keep_inds = np.append(fg_inds, bg_inds)
       if _DEBUG: 
           print ('keep_inds')
@@ -74,6 +79,8 @@ def encode(gt_boxes, rois, num_classes):
           print ('cfg.FLAGS.bg_threshold:', cfg.FLAGS.bg_threshold)
           print (max_overlaps)
 
+          LOG('ROIEncoder: %d positive rois, %d negative rois' % (len(fg_inds), len(bg_inds)))
+
       bbox_targets, bbox_inside_weights = _compute_targets(
         rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
       bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
@@ -84,11 +91,12 @@ def encode(gt_boxes, rois, num_classes):
       labels = np.zeros((num_rois, ), np.float32)
       bbox_targets = np.zeros((num_rois, 4 * num_classes), np.float32)
       bbox_inside_weights = np.zeros((num_rois, 4 * num_classes), np.float32)
-      bg_rois  = int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction))
+      bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 8)
       if bg_rois < num_rois:
           bg_inds = np.arange(num_rois)
           ignore_inds = np.random.choice(bg_inds, size=num_rois - bg_rois, replace=False)
           labels[ignore_inds] = -1 
+
   return labels, bbox_targets, bbox_inside_weights
 
 def decode(boxes, scores, rois, ih, iw):
