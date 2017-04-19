@@ -40,7 +40,9 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       gt_assignment = overlaps.argmax(axis=1)  # shape is N
       max_overlaps = overlaps[np.arange(len(gt_assignment)), gt_assignment] # N
       # note: this will assign every rois with a positive label 
-      labels = gt_boxes[gt_assignment, 4] # N
+      # labels = gt_boxes[gt_assignment, 4] # N
+      labels = np.zeros((total_masks, ), np.float32)
+      labels[:] = -1
 
       # sample positive rois which intersection is more than 0.5
       keep_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
@@ -49,6 +51,8 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
         keep_inds = np.random.choice(keep_inds, size=num_masks, replace=False)
         LOG('Masks: %d of %d rois are considered positive mask. Number of masks %d'\
                      %(num_masks, rois.shape[0], gt_masks.shape[0]))
+
+      labels[keep_inds] = gt_boxes[gt_assignment[keep_inds], -1]
         
       # rois = rois[inds]
       # labels = labels[inds].astype(np.int32)
@@ -74,6 +78,7 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   else:
       # there is no gt
       labels = np.zeros((total_masks, ), np.float32)
+      labels[:] = -1
       mask_targets = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.int32)
       mask_inside_weights = np.zeros((total_masks, mask_height, mask_height, num_classes), dtype=np.float32)
   return labels, mask_targets, mask_inside_weights
