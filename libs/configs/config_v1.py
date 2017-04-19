@@ -45,7 +45,7 @@ tf.app.flags.DEFINE_float(
     'weight_decay', 0.00004, 'The weight decay on the model weights.')
 
 tf.app.flags.DEFINE_string(
-    'optimizer', 'momentum',
+    'optimizer', 'rmsprop',
     'The name of the optimizer, one of "adadelta", "adagrad", "adam",'
     '"ftrl", "momentum", "sgd" or "rmsprop".')
 
@@ -97,11 +97,11 @@ tf.app.flags.DEFINE_string(
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.001,
+tf.app.flags.DEFINE_float('learning_rate', 0.01,
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
-    'end_learning_rate', 0.0001,
+    'end_learning_rate', 0.001,
     'The minimal end learning rate used by a polynomial decay learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -167,7 +167,7 @@ tf.app.flags.DEFINE_string(
     'The classes to classify.')
 
 tf.app.flags.DEFINE_integer(
-    'image_min_size', 800,
+    'image_min_size', 600,
     'resize image so that the min edge equals to image_min_size')
 
 #####################
@@ -238,7 +238,7 @@ tf.app.flags.DEFINE_integer(
     'Number of rpn anchors that should be sampled before nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_top_n', 128,
+    'post_nms_top_n', 256,
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_float(
