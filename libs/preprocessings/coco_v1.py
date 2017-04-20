@@ -64,6 +64,9 @@ def preprocess_for_training(image, gt_boxes, gt_masks):
     image = (image - 0.5) * 2.0
     image = tf.expand_dims(image, axis=0)
 
+    ## rgb to bgr
+    image = tf.reverse(image, axis=[-1])
+
     return image, gt_boxes, gt_masks 
 
 def preprocess_for_test(image, gt_boxes, gt_masks):
@@ -91,5 +94,8 @@ def preprocess_for_test(image, gt_boxes, gt_masks):
     image = image / 256.0
     image = (image - 0.5) * 2.0
     image = tf.expand_dims(image, axis=0)
+
+    ## rgb to bgr
+    image = tf.reverse(image, axis=[-1])
 
     return image, gt_boxes, gt_masks 
