@@ -38,7 +38,7 @@ with tf.Graph().as_default():
       image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training=True)
       
       ##  network
-      with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.00001)):
+      with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.0001)):
         logits, end_points = resnet50(image, 1000, is_training=False)
       end_points['inputs'] = image
       
@@ -61,9 +61,9 @@ with tf.Graph().as_default():
       loss, losses, batch_info = pyramid_network.build_losses(pyramid, outputs,
                                              gt_boxes, gt_masks,
                                              num_classes=81, base_anchors=15, 
-                                             rpn_box_lw =1.0, rpn_cls_lw = 0.2,
-                                             refined_box_lw=5.0, refined_cls_lw=0.1,
-                                             mask_lw=0.2)
+                                             rpn_box_lw =0.1, rpn_cls_lw = 0.2,
+                                             refined_box_lw=0.0, refined_cls_lw=0.0,
+                                             mask_lw=0.0)
 
       ## optimization
       learning_rate = _configure_learning_rate(82783, global_step)
@@ -132,8 +132,7 @@ with tf.Graph().as_default():
       # memory_util.print_memory_timeline(stderr, ignore_less_than_bytes=1000)
       
       ## training loop
-      print ('Starting training...')
-      # with sess.as_default():  
+      saver = tf.train.Saver(max_to_keep=20)
       for step in range(FLAGS.max_iters):
         start_time = time.time()
         
