@@ -175,11 +175,9 @@ def _to_tfexample_coco_raw(image_id, image_data, label_data,
     'image/encoded': _bytes_feature(image_data),
     'image/height': _int64_feature(height),
     'image/width': _int64_feature(width),
-    
     'label/num_instances': _int64_feature(num_instances),  # N
     'label/gt_boxes': _bytes_feature(gt_boxes),  # of shape (N, 5), (x1, y1, x2, y2, classid)
     'label/gt_masks': _bytes_feature(masks),  # of shape (N, height, width)
-    
     'label/encoded': _bytes_feature(label_data),  # deprecated, this is used for pixel-level segmentation
   }))
 
@@ -223,7 +221,7 @@ def _get_coco_masks(coco, img_id, height, width, img_name):
   bboxes[:, 3] = bboxes[:, 1] + bboxes[:, 3]
   gt_boxes = np.hstack((bboxes, classes[:, np.newaxis]))
   gt_boxes = gt_boxes.astype(np.float32)
-  masks = masks.astype(np.int32)
+  masks = masks.astype(np.uint8)
   mask = mask.astype(np.uint8)
   assert masks.shape[0] == gt_boxes.shape[0], 'Shape Error'
   
@@ -263,9 +261,10 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
           start_ndx = shard_id * num_per_shard
           end_ndx = min((shard_id + 1) * num_per_shard, len(imgs))
           for i in range(start_ndx, end_ndx):
-            sys.stdout.write('\r>> Converting image %d/%d shard %d\n' % (
-              i + 1, len(imgs), shard_id))
-            sys.stdout.flush()
+            if i % 50 == 0:
+                sys.stdout.write('\r>> Converting image %d/%d shard %d\n' % (
+                  i + 1, len(imgs), shard_id))
+                sys.stdout.flush()
             
             # image id and path
             img_id = imgs[i][0]
@@ -291,6 +290,15 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
             
             # read image as RGB numpy
             img = np.array(Image.open(img_name))
+            if img.size == height * width:
+                print ('Gray Image %s' % str(img_id))
+                im = np.empty((height, width, 3), dtype=np.uint8)
+                im[:, :, :] = img[:, :, np.newaxis]
+                img = im
+
+            img = img.astype(np.uint8)
+            assert img.size == width * height * 3, '%s' % str(img_id)
+
             img_raw = img.tostring()
             mask_raw = mask.tostring()
             

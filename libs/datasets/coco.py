@@ -101,12 +101,14 @@ def read(tfrecords_filename):
     serialized_example,
     features={
       'image/img_id': tf.FixedLenFeature([], tf.int64),
+      'image/encoded': tf.FixedLenFeature([], tf.string),
       'image/height': tf.FixedLenFeature([], tf.int64),
       'image/width': tf.FixedLenFeature([], tf.int64),
-      'image/encoded': tf.FixedLenFeature([], tf.string),
+      'label/num_instances': tf.FixedLenFeature([], tf.int64),
       'label/gt_masks': tf.FixedLenFeature([], tf.string),
       'label/gt_boxes': tf.FixedLenFeature([], tf.string),
-      'label/num_instances': tf.FixedLenFeature([], tf.int64),} )
+      'label/encoded': tf.FixedLenFeature([], tf.string),
+      })
   # image = tf.image.decode_jpeg(features['image/encoded'], channels=3)
   img_id = tf.cast(features['image/img_id'], tf.int32)
   ih = tf.cast(features['image/height'], tf.int32)
@@ -120,7 +122,8 @@ def read(tfrecords_filename):
 
   gt_boxes = tf.decode_raw(features['label/gt_boxes'], tf.float32)
   gt_boxes = tf.reshape(gt_boxes, [num_instances, 5])
-  gt_masks = tf.decode_raw(features['label/gt_masks'], tf.int32)
+  gt_masks = tf.decode_raw(features['label/gt_masks'], tf.uint8)
+  gt_masks = tf.cast(gt_masks, tf.int32)
   gt_masks = tf.reshape(gt_masks, [num_instances, ih, iw])
   
   return image, ih, iw, gt_boxes, gt_masks, num_instances, img_id
