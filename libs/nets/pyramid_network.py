@@ -33,26 +33,26 @@ _networks_map = {
                }
 }
 
-def _extra_conv_arg_scope(weight_decay=0.0005, activation_fn=None, normalizer_fn=None):
+def _extra_conv_arg_scope(weight_decay=0.00005, activation_fn=None, normalizer_fn=None):
 
   with slim.arg_scope(
       [slim.conv2d, slim.conv2d_transpose],
       padding='SAME',
       weights_regularizer=slim.l2_regularizer(weight_decay),
-      weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
+      weights_initializer=tf.truncated_normal_initializer(stddev=0.01),
       activation_fn=activation_fn,
       normalizer_fn=normalizer_fn,) as arg_sc:
     with slim.arg_scope(
       [slim.fully_connected],
           weights_regularizer=slim.l2_regularizer(weight_decay),
-          weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
+          weights_initializer=tf.truncated_normal_initializer(stddev=0.01),
           activation_fn=activation_fn,
           normalizer_fn=normalizer_fn) as arg_sc:
           return arg_sc
 
 def my_sigmoid(x):
     """add an active function for the box output layer, which is linear around 0"""
-    return (tf.nn.sigmoid(x) - tf.cast(0.5, tf.float32)) * 12.0
+    return (tf.nn.sigmoid(x) - tf.cast(0.5, tf.float32)) * 6.0
 
 def _smooth_l1_dist(x, y, sigma2=9.0, name='smooth_l1_dist'):
   """Smooth L1 loss
@@ -171,7 +171,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
   """
   outputs = {}
   arg_scope = _extra_conv_arg_scope(activation_fn=None)
-  # my_sigmoid = None
+  my_sigmoid = None
   with slim.arg_scope(arg_scope):
     with tf.variable_scope('pyramid'):
         # for p in pyramid:
@@ -185,7 +185,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
           height, width = shape[1], shape[2]
           rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='%s/rpn'%p)
           box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p, \
-                  weights_initializer=tf.truncated_normal_initializer(stddev=0.001), activation_fn=my_sigmoid)
+                  weights_initializer=tf.random_normal_initializer(stddev=0.00001), activation_fn=my_sigmoid)
           cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
           outputs[p]['rpn'] = {'box': box, 'cls': cls}
