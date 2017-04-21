@@ -111,15 +111,17 @@ def mask_decoder(mask_targets, rois, classes, ih, iw, scope='MaskDecoder'):
 def sample_wrapper(boxes, scores, is_training=False, scope='SampleBoxes'):
   
   with tf.name_scope(scope) as sc:
-    boxes, scores = \
+    boxes, scores, batch_inds = \
       tf.py_func(sample.sample_rpn_outputs,
                  [boxes, scores, is_training],
-                 [tf.float32, tf.float32])
+                 [tf.float32, tf.float32, tf.int32])
     boxes = tf.convert_to_tensor(boxes, name='Boxes')
     scores = tf.convert_to_tensor(scores, name='Scores')
+    batch_inds = tf.convert_to_tensor(batch_inds, name='BatchInds')
     boxes = tf.reshape(boxes, (-1, 4))
+    batch_inds = tf.reshape(batch_inds, [-1])
   
-  return boxes, scores
+  return boxes, scores, batch_inds
 
 def sample_with_gt_wrapper(boxes, scores, gt_boxes, is_training=False, scope='SampleBoxesWithGT'):
   

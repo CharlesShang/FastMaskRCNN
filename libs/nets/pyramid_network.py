@@ -33,19 +33,43 @@ _networks_map = {
                }
 }
 
-def _extra_conv_arg_scope(weight_decay=0.00005, activation_fn=None, normalizer_fn=None):
+def _extra_conv_arg_scope_with_bn(weight_decay=0.00001,
+                     activation_fn=None,
+                     batch_norm_decay=0.997,
+                     batch_norm_epsilon=1e-5,
+                     batch_norm_scale=True):
+
+  batch_norm_params = {
+      'decay': batch_norm_decay,
+      'epsilon': batch_norm_epsilon,
+      'scale': batch_norm_scale,
+      'updates_collections': tf.GraphKeys.UPDATE_OPS_EXTRA,
+  }
+
+  with slim.arg_scope(
+      [slim.conv2d],
+      weights_regularizer=slim.l2_regularizer(weight_decay),
+      weights_initializer=slim.variance_scaling_initializer(),
+      activation_fn=tf.nn.relu,
+      normalizer_fn=slim.batch_norm,
+      normalizer_params=batch_norm_params):
+    with slim.arg_scope([slim.batch_norm], **batch_norm_params):
+      with slim.arg_scope([slim.max_pool2d], padding='SAME') as arg_sc:
+        return arg_sc
+
+def _extra_conv_arg_scope(weight_decay=0.00001, activation_fn=None, normalizer_fn=None):
 
   with slim.arg_scope(
       [slim.conv2d, slim.conv2d_transpose],
       padding='SAME',
       weights_regularizer=slim.l2_regularizer(weight_decay),
-      weights_initializer=tf.truncated_normal_initializer(stddev=0.01),
+      weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
       activation_fn=activation_fn,
       normalizer_fn=normalizer_fn,) as arg_sc:
     with slim.arg_scope(
       [slim.fully_connected],
           weights_regularizer=slim.l2_regularizer(weight_decay),
-          weights_initializer=tf.truncated_normal_initializer(stddev=0.01),
+          weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
           activation_fn=activation_fn,
           normalizer_fn=normalizer_fn) as arg_sc:
           return arg_sc
@@ -101,7 +125,7 @@ def _filter_negative_samples(labels, tensors):
 
     return filtered
         
-def _add_jittered_boxes(rois, gt_boxes, jitter=0.1):
+def _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.1):
     ws = gt_boxes[:, 2] - gt_boxes[:, 0]
     hs = gt_boxes[:, 3] - gt_boxes[:, 1]
     shape = tf.shape(gt_boxes)[0]
@@ -120,7 +144,12 @@ def _add_jittered_boxes(rois, gt_boxes, jitter=0.1):
                 x2s[:, tf.newaxis],
                 y2s[:, tf.newaxis]],
             axis=1)
-    return tf.concat(values=[rois, boxes], axis=0)
+    new_scores = tf.ones([shape], tf.float32)
+    new_batch_inds = tf.zeros([shape], tf.int32)
+
+    return tf.concat(values=[rois, boxes], axis=0), \
+           tf.concat(values=[scores, new_scores], axis=0), \
+           tf.concat(values=[batch_inds, new_batch_inds], axis=0)
 
 def build_pyramid(net_name, end_points, bilinear=True):
   """build pyramid features from a typical network,
@@ -156,7 +185,7 @@ def build_pyramid(net_name, end_points, bilinear=True):
       
       return pyramid
   
-def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
+def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, gt_boxes=None):
   """Build the 3-way outputs, i.e., class, box and mask in the pyramid
   Algo
   ----
@@ -185,7 +214,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
           height, width = shape[1], shape[2]
           rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='%s/rpn'%p)
           box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p, \
-                  weights_initializer=tf.random_normal_initializer(stddev=0.00001), activation_fn=my_sigmoid)
+                  weights_initializer=tf.truncated_normal_initializer(stddev=0.001), activation_fn=my_sigmoid)
           cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
           outputs[p]['rpn'] = {'box': box, 'cls': cls}
@@ -198,9 +227,13 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
                                 [1, shape[1], shape[2], base_anchors * 2])
           rois, classes, scores = \
                     anchor_decoder(box, cls_prob, all_anchors, ih, iw)
-          rois, scores = sample_rpn_outputs(rois, scores)
+          rois, scores, batch_inds = sample_rpn_outputs(rois, scores)
+          if is_training:
+              # rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes)
+              rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.2)
+
           # rois, scores = sample_rpn_outputs_with_gt(rois, scores, gt_boxes, is_training)
-          cropped = ROIAlign(pyramid[p], rois, False, stride=2**i,
+          cropped = ROIAlign(pyramid[p], rois, batch_inds, stride=2**i,
                              pooled_height=7, pooled_width=7,)
 
           # rois of an image, sampled from rpn output
@@ -228,7 +261,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False):
             rois = final_boxes
           
           ## mask head
-          m = ROIAlign(pyramid[p], rois, False, stride=2 ** i,
+          m = ROIAlign(pyramid[p], rois, batch_inds, stride=2 ** i,
                        pooled_height=14, pooled_width=14)
           outputs[p]['roi']['cropped_mask'] = m
           for _ in range(4):
@@ -338,9 +371,6 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
             # 1. encode ground truth
             # 2. compute distances
             rois = outputs[p]['roi']['box']
-            rois = _add_jittered_boxes(rois, gt_boxes)
-            rois = _add_jittered_boxes(rois, gt_boxes, jitter=0.2)
-            rois = _add_jittered_boxes(rois, gt_boxes, jitter=0.4)
             
             boxes = outputs[p]['refined']['box']
             classes = outputs[p]['refined']['cls']

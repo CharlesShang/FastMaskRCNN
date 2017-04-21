@@ -56,16 +56,20 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
     keeps = keeps[:post_nms_top_n]
   boxes = boxes[keeps, :]
   scores = scores[keeps]
+  batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 
   if _DEBUG:
     LOG('SAMPLE: %d rois has been choosen' % len(keeps))
     LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
+    hs = boxes[:, 3] - boxes[:, 1]
+    ws = boxes[:, 2] - boxes[:, 0]
+    assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
   
-  return boxes, scores
+  return boxes, scores, batch_inds
 
 def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, only_positive=False):
     """sample boxes for refined output"""
-    boxes, scores = sample_rpn_outputs(boxes, scores, is_training, only_positive)
+    boxes, scores, batch_inds = sample_rpn_outputs(boxes, scores, is_training, only_positive)
 
     if is_training and gt_boxes.size > 0:
         boxes = np.vstack((boxes, _jitter_boxes(gt_boxes[:, :4])))

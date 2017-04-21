@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-def crop(images, boxes, batch_inds = False, stride = 1, pooled_height = 7, pooled_width = 7, scope='ROIAlign'):
+def crop(images, boxes, batch_inds, stride = 1, pooled_height = 7, pooled_width = 7, scope='ROIAlign'):
   """Cropping areas of features into fixed size
   Params:
   --------
@@ -31,10 +31,16 @@ def crop(images, boxes, batch_inds = False, stride = 1, pooled_height = 7, poole
     boxes = tf.concat([ys[:, tf.newaxis], xs[:, tf.newaxis]], axis=1)
     boxes = tf.reshape(boxes, [-1, 4])  # to (y1, x1, y2, x2)
     
-    if batch_inds is False:
-      num_boxes = tf.shape(boxes)[0]
-      batch_inds = tf.zeros([num_boxes], dtype=tf.int32, name='batch_inds')
-    return  tf.image.crop_and_resize(images, boxes, batch_inds,
-                                     [pooled_height, pooled_width],
-                                     method='bilinear',
-                                     name='Crop')
+    # if batch_inds is False:
+    #   num_boxes = tf.shape(boxes)[0]
+    #   batch_inds = tf.zeros([num_boxes], dtype=tf.int32, name='batch_inds')
+    # batch_inds = boxes[:, 0] * 0
+    # batch_inds = tf.cast(batch_inds, tf.int32)
+
+    # assert_op = tf.Assert(tf.greater(tf.shape(images)[0], tf.reduce_max(batch_inds)), [images, batch_inds])
+    assert_op = tf.Assert(tf.greater(tf.size(images), 0), [images, batch_inds])
+    with tf.control_dependencies([assert_op, images, batch_inds]):
+        return  tf.image.crop_and_resize(images, boxes, batch_inds,
+                                         [pooled_height, pooled_width],
+                                         method='bilinear',
+                                         name='Crop')
