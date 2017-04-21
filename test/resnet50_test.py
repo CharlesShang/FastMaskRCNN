@@ -35,7 +35,8 @@ with tf.Graph().as_default():
       ## data
       image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = \
         coco.read('./data/coco/records/coco_train2014_00000-of-00040.tfrecord')
-      image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training=True)
+      with tf.control_dependencies([image, gt_boxes, gt_masks]):
+        image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training=True)
       
       ##  network
       with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.0001)):
@@ -54,7 +55,7 @@ with tf.Graph().as_default():
         summaries.add(tf.summary.histogram('pyramid/hist/' + p, pyramid[p]))
         summaries.add(tf.summary.scalar('pyramid/means/'+ p, tf.reduce_mean(tf.abs(pyramid[p]))))
         
-      outputs = pyramid_network.build_heads(pyramid, ih, iw, num_classes=81, base_anchors=15, is_training=True)
+      outputs = pyramid_network.build_heads(pyramid, ih, iw, num_classes=81, base_anchors=15, is_training=True, gt_boxes=gt_boxes)
       
       
       ## losses
@@ -62,8 +63,8 @@ with tf.Graph().as_default():
                                              gt_boxes, gt_masks,
                                              num_classes=81, base_anchors=15, 
                                              rpn_box_lw =0.1, rpn_cls_lw = 0.2,
-                                             refined_box_lw=0.0, refined_cls_lw=0.0,
-                                             mask_lw=0.0)
+                                             refined_box_lw=2.0, refined_cls_lw=0.1,
+                                             mask_lw=0.2)
 
       ## optimization
       learning_rate = _configure_learning_rate(82783, global_step)
@@ -100,7 +101,8 @@ with tf.Graph().as_default():
                          tf.local_variables_initializer())
       
       sess.run(init_op)
-      tf.train.start_queue_runners(sess=sess)
+      coord = tf.train.Coordinator()
+      tf.train.start_queue_runners(sess=sess, coord=coord)
 
       ## restore pretrained model
       # FLAGS.pretrained_model = None
@@ -169,3 +171,7 @@ with tf.Graph().as_default():
           checkpoint_path = os.path.join(FLAGS.train_dir, 
                                          FLAGS.dataset_name + '_model.ckpt')
           saver.save(sess, checkpoint_path, global_step=step)
+
+        if coord.should_stop():
+              coord.request_stop()
+              coord.join(threads)
