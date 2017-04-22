@@ -89,8 +89,7 @@ ENV/
 # Rope project settings
 .ropeproject
 
-test
 data/coco   
 data/pretrained_models
-train/
 tags
+output
