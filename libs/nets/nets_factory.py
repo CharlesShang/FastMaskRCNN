@@ -5,35 +5,38 @@ import functools
 
 import tensorflow as tf
 
+from . import resnet_v1
 from .resnet_v1 import resnet_v1_50 as resnet50
 from .resnet_utils import resnet_arg_scope
 from .resnet_v1 import resnet_v1_101 as resnet101
 
 slim = tf.contrib.slim
 
-networks_map = {'resnet50': resnet50,
-                'resnet101': resnet101,
+pyramid_maps = {
+  'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
+               'C2':'resnet_v1_50/block1/unit_2/bottleneck_v1',
+               'C3':'resnet_v1_50/block2/unit_3/bottleneck_v1',
+               'C4':'resnet_v1_50/block3/unit_5/bottleneck_v1',
+               'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
+               },
+  'resnet101': {'C1': '', 'C2': '',
+                'C3': '', 'C4': '',
+                'C5': '',
                }
+}
 
-arg_scopes_map = {'resnet50': resnet_arg_scope,
-                  'resnet101': resnet_arg_scope,
-                 }
+def get_network(name, image, weight_decay=0.000005, is_training=False):
 
-def get_network_fn(name, num_classes, weight_decay=0.00005, is_training=False):
-  """ Load the pretrained model graph,
-   Set is_training to False to disable BN update
-  """
-  if name not in networks_map:
-    raise ValueError('Name of network unknown %s' % name)
+    if name == 'resnet50':
+        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=weight_decay)):
+            logits, end_points = resnet50(image, 1000, is_training=is_training)
+    
+    if name == 'resnet101':
+        with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=weight_decay)):
+            logits, end_points = resnet50(image, 1000, is_training=is_training)
 
-  arg_scope = arg_scopes_map[name](weight_decay=weight_decay)
-  func = networks_map[name]
+    if name == 'resnext50':
+        name
 
-  @functools.wraps(func)
-  def network_fn(images):
-    with slim.arg_scope(arg_scope):
-      return func(images, num_classes, is_training=is_training)
-  if hasattr(func, 'default_image_size'):
-    network_fn.default_image_size = func.default_image_size
-
-  return network_fn
+    end_points['input'] = image
+    return logits, end_points, pyramid_maps[name]

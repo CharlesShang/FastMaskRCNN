@@ -158,17 +158,20 @@ def build_pyramid(net_name, end_points, bilinear=True):
     returns several endpoints
   """
   pyramid = {}
-  convs_map = _networks_map[net_name]
+  if isinstance(net_name, str):
+    pyramid_map = _networks_map[net_name]
+  else:
+    pyramid_map = net_name
   # pyramid['inputs'] = end_points['inputs']
   arg_scope = _extra_conv_arg_scope()
   with tf.variable_scope('pyramid'):
     with slim.arg_scope(arg_scope):
       
       pyramid['P5'] = \
-        slim.conv2d(end_points[convs_map['C5']], 256, [1, 1], stride=1, scope='C5')
+        slim.conv2d(end_points[pyramid_map['C5']], 256, [1, 1], stride=1, scope='C5')
       
       for c in range(4, 1, -1):
-        s, s_ = pyramid['P%d'%(c+1)], end_points[convs_map['C%d' % (c)]]
+        s, s_ = pyramid['P%d'%(c+1)], end_points[pyramid_map['C%d' % (c)]]
 
         # s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
         
@@ -204,6 +207,8 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
   with slim.arg_scope(arg_scope):
     with tf.variable_scope('pyramid'):
         # for p in pyramid:
+        if is_training:
+            assigned_gt_boxes = assign_boxes(gt_boxes, [2, 3, 4, 5])
         for i in range(5, 1, -1):
           p = 'P%d'%i
           stride = 2 ** i
@@ -220,7 +225,9 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           outputs[p]['rpn'] = {'box': box, 'cls': cls}
           
           ## decode, sample and crop
-          all_anchors = gen_all_anchors(height, width, stride)
+          # anchor_scales = [2 ** (i-1), 2 **(i)]
+          anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)]
+          all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
           cls_prob = tf.reshape(tf.nn.softmax(
                                 tf.reshape(cls,
                                 [1, shape[1], shape[2], base_anchors, 2])),
@@ -230,6 +237,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           rois, scores, batch_inds = sample_rpn_outputs(rois, scores)
           if is_training:
               # rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes)
+              gt_boxes = assigned_gt_boxes[i-2]
               rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.2)
 
           # rois, scores = sample_rpn_outputs_with_gt(rois, scores, gt_boxes, is_training)
@@ -326,7 +334,8 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
             ### rpn losses
             # 1. encode ground truth
             # 2. compute distances
-            all_anchors = gen_all_anchors(height, width, stride)
+            anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)]
+            all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
             labels, bbox_targets, bbox_inside_weights = \
               anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEncoder')
             boxes = outputs[p]['rpn']['box']
@@ -460,3 +469,44 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
   return total_loss, losses, [rpn_batch_pos, rpn_batch, \
                               refine_batch_pos, refine_batch, \
                               mask_batch_pos, mask_batch]
+
+def decode_output(outputs):
+    """decode outputs into boxes and masks"""
+    return [], [], []
+
+def build(end_points, image_height, image_width, pyramid_map, 
+        num_classes,
+        base_anchors,
+        is_training,
+        gt_boxes,
+        gt_masks, 
+        loss_weights=[0.1, 0.2, 1.0, 0.2, 0.1]):
+    
+    pyramid = build_pyramid(pyramid_map, end_points)
+
+    for p in pyramid:
+        print (p)
+
+    outputs = \
+        build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
+                    is_training=is_training, gt_boxes=gt_boxes)
+
+    if is_training:
+        loss, losses, batch_info = build_losses(pyramid, outputs, 
+                        gt_boxes, gt_masks,
+                        num_classes=num_classes, base_anchors=base_anchors,
+                        rpn_box_lw=loss_weights[0], rpn_cls_lw=loss_weights[1],
+                        refined_box_lw=loss_weights[2], refined_cls_lw=loss_weights[3],
+                        mask_lw=loss_weights[4])
+
+        outputs['losses'] = losses
+        outputs['total_loss'] = loss
+        outputs['batch_info'] = batch_info
+
+    ## just decode outputs into readable prediction
+    pred_boxes, pred_classes, pred_masks = decode_output(outputs)
+    outputs['pred_boxes'] = pred_boxes
+    outputs['pred_classes'] = pred_classes
+    outputs['pred_masks'] = pred_masks
+
+    return outputs
