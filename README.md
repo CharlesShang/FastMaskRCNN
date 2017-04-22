@@ -1,4 +1,4 @@
-# Fast Mask RCNN
+# Mask RCNN
 Mask RCNN in TensorFlow  
 This repo attempts to reporduce this amazing work by Kaiming He.
 [Mask RCNN](https://arxiv.org/abs/1703.06870).
