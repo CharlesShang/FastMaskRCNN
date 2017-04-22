@@ -8,7 +8,7 @@ This repo attempts to reporduce this amazing work by Kaiming He.
 2. Download pretrained resnet50 model, `wget http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz`, unzip it, place it into `./data/pretrained_models/`
 3. Go to `./libs` and run `make`
 4. run `python train/train.py` for training 
-5. There are certainly some bugs, please report them back, and let's solve them togather.
+5. There are certainly some bugs, please report them back, and let's solve them together.
 
 ## TODO:
 - [x] ROIAlign
