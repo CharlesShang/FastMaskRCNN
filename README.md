@@ -21,8 +21,12 @@ This repo attempts to reporduce this amazing work by Kaiming He.
 - [x] Combining all modules together. 
 - [x] Testing and debugging (in progress)
 - [ ] Training / evaluation on COCO
+- [ ] Add image summary to show some results
 - [ ] Converting ResneXt
 - [ ] Training >2 images
 
-## Call for contribution
+## Call for contributions
 - Anything helps this repo, including **discussion**, **testing**, **promotion** and of course **your awesome code**. 
+
+## Acknowledgment
+This repo borrows tons of code from [TFFRCNN](https://github.com/CharlesShang/TFFRCNN), [py-faster-rcnn](https://github.com/rbgirshick/py-faster-rcnn), [faster_rcnn](https://github.com/ShaoqingRen/faster_rcnn), [tf-models](https://github.com/tensorflow/models)
