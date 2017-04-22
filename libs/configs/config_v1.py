@@ -4,18 +4,51 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-
+##########################
+#                  restore
+##########################
 tf.app.flags.DEFINE_string(
-    'train_dir', './train/maskrcnn/',
+    'train_dir', './output/mask_rcnn/',
     'Directory where checkpoints and event logs are written to.')
 
 tf.app.flags.DEFINE_string(
     'pretrained_model', './data/pretrained_models/resnet_v1_50.ckpt',
     'Path to pretrained model')
 
+##########################
+#                  network
+##########################
+tf.app.flags.DEFINE_string(
+    'network', 'resnet50',
+    'name of backbone network')
+
+##########################
+#                  dataset
+##########################
+tf.app.flags.DEFINE_bool(
+    'update_bn', False,
+    'Whether or not to update bacth normalization layer')
+
 tf.app.flags.DEFINE_integer(
     'num_readers', 4,
     'The number of parallel readers that read data from the dataset.')
+
+tf.app.flags.DEFINE_string(
+    'dataset_name', 'coco',
+    'The name of the dataset to load.')
+
+tf.app.flags.DEFINE_string(
+    'dataset_split_name', 'train2014',
+    'The name of the train/test/val split.')
+
+tf.app.flags.DEFINE_string(
+    'dataset_dir', 'data/coco/',
+    'The directory where the dataset files are stored.')
+
+tf.app.flags.DEFINE_integer(
+    'im_batch', 1,
+    'number of images in a mini-batch')
+
 
 tf.app.flags.DEFINE_integer(
     'num_preprocessing_threads', 4,
@@ -131,17 +164,6 @@ tf.app.flags.DEFINE_float(
 # Dataset Flags #
 #######################
 
-tf.app.flags.DEFINE_string(
-    'dataset_name', 'coco',
-    'The name of the dataset to load.')
-
-tf.app.flags.DEFINE_string(
-    'dataset_split_name', 'train2014',
-    'The name of the train/test split.')
-
-tf.app.flags.DEFINE_string(
-    'dataset_dir', 'data/coco/',
-    'The directory where the dataset files are stored.')
 
 tf.app.flags.DEFINE_string(
     'model_name', 'resnet50',
@@ -210,7 +232,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
-    'rois_per_image', 64,
+    'rois_per_image', 128,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
@@ -226,7 +248,7 @@ tf.app.flags.DEFINE_integer(
     'Number of rpn anchors that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
-    'allow_border', 0,
+    'allow_border', 10,
     'How many pixels out of an image')
 
 ##################################
@@ -261,7 +283,7 @@ tf.app.flags.DEFINE_integer(
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
-    'min_size', 16,
+    'min_size', 8,
     'minimum size of an object')
 
 FLAGS = tf.app.flags.FLAGS
