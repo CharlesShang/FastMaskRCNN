@@ -136,12 +136,12 @@ def sample_with_gt_wrapper(boxes, scores, gt_boxes, is_training=False, scope='Sa
   
   return boxes, scores
 
-def gen_all_anchors(height, width, stride, scope='GenAnchors'):
+def gen_all_anchors(height, width, stride, scales, scope='GenAnchors'):
   
   with tf.name_scope(scope) as sc:
     all_anchors = \
       tf.py_func(anchors_plane,
-                 [height, width, stride],
+                 [height, width, stride, scales],
                  [tf.float64]
                  )
     all_anchors = tf.convert_to_tensor(tf.cast(all_anchors, tf.float32), name='AllAnchors')
