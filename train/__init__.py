@@ -2,4 +2,3 @@
 # coding=utf-8
 
 from . import train_utils
-from . import foo
