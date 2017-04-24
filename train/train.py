@@ -21,8 +21,6 @@ import libs.preprocessings.coco_v1 as coco_preprocess
 import libs.nets.pyramid_network as pyramid_network
 import libs.nets.resnet_v1 as resnet_v1
 
-from train.foo import foo
-
 from train.train_utils import _configure_learning_rate, _configure_optimizer, \
   _get_variables_to_train, _get_init_fn, get_var_list_to_restore
 
