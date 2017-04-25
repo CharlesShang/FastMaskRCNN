@@ -100,7 +100,7 @@ def _configure_learning_rate(num_samples_per_epoch, global_step):
   else:
     raise ValueError('learning_rate_decay_type [%s] was not recognized',
                      FLAGS.learning_rate_decay_type)
-  
+
 def _get_variables_to_train():
   """Returns a list of variables to train.
 
@@ -146,12 +146,10 @@ def _get_init_fn():
   # TODO(sguada) variables.filter_variables()
   variables_to_restore = []
   for var in slim.get_model_variables():
-    excluded = False
     for exclusion in exclusions:
       if var.op.name.startswith(exclusion):
-        excluded = True
         break
-    if not excluded:
+    else:
       variables_to_restore.append(var)
 
   if tf.gfile.IsDirectory(FLAGS.checkpoint_path):
@@ -176,12 +174,10 @@ def get_var_list_to_restore():
 
     # build restore list
     for var in tf.model_variables():
-      excluded = False
       for exclusion in exclusions:
         if var.name.startswith(exclusion):
-          excluded = True
           break
-      if not excluded:
+      else:
         variables_to_restore.append(var)
   else:
     variables_to_restore = tf.model_variables()
