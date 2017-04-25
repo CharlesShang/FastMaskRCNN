@@ -130,8 +130,8 @@ def _get_init_fn():
   if FLAGS.checkpoint_path is None:
     return None
 
-  # Warn the user if a checkpoint exists in the train_dir. Then we'll be
-  # ignoring the checkpoint anyway.
+  # Warn the user if a checkpoint exists in the train_dir. Then we'll
+  # ignore the checkpoint anyway.
   if tf.train.latest_checkpoint(FLAGS.train_dir):
     tf.logging.info(
         'Ignoring --checkpoint_path because a checkpoint already exists in %s'
@@ -165,7 +165,7 @@ def _get_init_fn():
       ignore_missing_vars=FLAGS.ignore_missing_vars)
 
 def get_var_list_to_restore():
-  """Choosing which vars to restore, ignore vars by setting --checkpoint_exclude_scopes """
+  """Choose which vars to restore, ignore vars by setting --checkpoint_exclude_scopes """
 
   variables_to_restore = []
   if FLAGS.checkpoint_exclude_scopes is not None:
@@ -189,13 +189,10 @@ def get_var_list_to_restore():
               for scope in FLAGS.checkpoint_include_scopes.split(',')
               ]
       for var in variables_to_restore:
-          included = False
           for include in includes:
               if var.name.startswith(include):
-                  included = True
+                  variables_to_restore_final.append(var)
                   break
-          if included:
-              variables_to_restore_final.append(var)
   else:
       variables_to_restore_final = variables_to_restore
 
