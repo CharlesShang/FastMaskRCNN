@@ -27,7 +27,7 @@ def main(_):
     raise ValueError('You must supply the dataset directory with --dataset_dir')
 
   elif FLAGS.dataset_name == 'coco':
-    download_and_convert_coco.run(FLAGS.dataset_dir)
+    download_and_convert_coco.run(FLAGS.dataset_dir, FLAGS.dataset_split_name)
   else:
     raise ValueError(
         'dataset_name [%s] was not recognized.' % FLAGS.dataset_dir)
