@@ -75,7 +75,7 @@ tf.app.flags.DEFINE_integer(
 ######################
 
 tf.app.flags.DEFINE_float(
-    'weight_decay', 0.00004, 'The weight decay on the model weights.')
+    'weight_decay', 0.000001, 'The weight decay on the model weights.')
 
 tf.app.flags.DEFINE_string(
     'optimizer', 'momentum',
@@ -232,7 +232,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
-    'rois_per_image', 128,
+    'rois_per_image', 256,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
@@ -256,11 +256,11 @@ tf.app.flags.DEFINE_integer(
 ##################################
 
 tf.app.flags.DEFINE_integer(
-    'pre_nms_top_n', 3000,
+    'pre_nms_top_n', 12000,
     'Number of rpn anchors that should be sampled before nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_top_n', 128,
+    'post_nms_top_n', 2000,
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_float(
