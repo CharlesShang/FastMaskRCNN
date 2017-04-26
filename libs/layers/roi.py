@@ -44,9 +44,9 @@ def encode(gt_boxes, rois, num_classes):
       labels = np.zeros([num_rois], dtype=np.float32)
       labels[:] = -1
 
-      if _DEBUG:
-          print ('gt_assignment')
-          print (gt_assignment)
+      # if _DEBUG:
+      #     print ('gt_assignment')
+      #     print (gt_assignment)
 
       # sample rois as to 1:3
       fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
@@ -77,7 +77,7 @@ def encode(gt_boxes, rois, num_classes):
           print (bg_inds)
           print ('bg_rois:', bg_rois)
           print ('cfg.FLAGS.bg_threshold:', cfg.FLAGS.bg_threshold)
-          print (max_overlaps)
+          # print (max_overlaps)
 
           LOG('ROIEncoder: %d positive rois, %d negative rois' % (len(fg_inds), len(bg_inds)))
 

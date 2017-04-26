@@ -22,9 +22,14 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   rpn_nms_threshold = cfg.FLAGS.rpn_nms_threshold
   pre_nms_top_n = cfg.FLAGS.pre_nms_top_n
   post_nms_top_n = cfg.FLAGS.post_nms_top_n
+  # rois_per_image = cfg.FLAGS.rois_per_image
+  # fg_roi_fraction =  cfg.FLAGS.fg_roi_fraction
+
+  # training: 12000, 2000
+  # testing: 6000, 400
   if not is_training:
     pre_nms_top_n = int(pre_nms_top_n / 2)
-    post_nms_top_n = int(post_nms_top_n / 2)
+    post_nms_top_n = int(post_nms_top_n / 5)
     
   boxes = boxes.reshape((-1, 4))
   scores = scores.reshape((-1, 1))
@@ -58,6 +63,11 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   scores = scores[keeps]
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 
+  # # random sample boxes
+  ## try early sample later
+  # fg_inds = np.where(scores > 0.5)[0]
+  # num_fgs = min(len(fg_inds.size), int(rois_per_image * fg_roi_fraction))
+
   if _DEBUG:
     LOG('SAMPLE: %d rois has been choosen' % len(keeps))
     LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
@@ -65,7 +75,7 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
     ws = boxes[:, 2] - boxes[:, 0]
     assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
   
-  return boxes, scores, batch_inds
+  return boxes, scores.astype(np.float32), batch_inds
 
 def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, only_positive=False):
     """sample boxes for refined output"""
