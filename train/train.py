@@ -138,6 +138,11 @@ def train():
 
     ## main loop
     coord = tf.train.Coordinator()
+    threads = []
+    for qr in tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS):
+        threads.extend(qr.create_threads(sess, coord=coord, daemon=True,
+                                         start=True))
+
     tf.train.start_queue_runners(sess=sess, coord=coord)
     saver = tf.train.Saver(max_to_keep=20)
 
