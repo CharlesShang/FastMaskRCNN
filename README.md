@@ -4,7 +4,8 @@ This repo attempts to reproduce this amazing work by Kaiming He.
 [Mask RCNN](https://arxiv.org/abs/1703.06870).
 
 ## How-to
-1. Download coco dataset, place it into `./data`, then run `python download_and_convert_data.py` to build tf-records. It takes a while.
+1. Download coco dataset, place it into `./data`, then run `python download_and_convert_data.py` to build tf-records. It takes a while. To download it, either go to
+[COCO](mscoco.org/dataset/#download) or run the script `downloaddata.sh` inside the data folder
 2. Download pretrained resnet50 model, `wget http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz`, unzip it, place it into `./data/pretrained_models/`
 3. Go to `./libs` and run `make`
 4. run `python train/train.py` for training
