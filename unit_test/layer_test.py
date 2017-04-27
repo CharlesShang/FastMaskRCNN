@@ -98,9 +98,11 @@ class anchor_test(layer_test):
             npscores = scores.eval().reshape((-1, 1))
             self.npboxes = np.hstack((self.npboxes, npscores))
             # print (self.npboxes.shape, npscores.shape)
+            bbox_targets_np = self.bbox_targets.reshape([-1, 4])
+            all_anchors_np = all_anchors.eval().reshape([-1, 4])
             for i in range(self.npboxes.shape[0]):
                 if self.npboxes[i, 4] >= 1:
-                    print (self.npboxes[i])
+                    print (bbox_targets_np[i], self.npboxes[i], all_anchors_np[i])
 
 class roi_test(layer_test):
 
