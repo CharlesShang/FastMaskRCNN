@@ -7,6 +7,8 @@ import numpy as np
 
 import libs.configs.config_v1 as cfg
 import libs.boxes.nms_wrapper as nms_wrapper
+import libs.boxes.cython_bbox as cython_bbox
+from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 from libs.logs.log import LOG
 
 _DEBUG=False
@@ -22,12 +24,16 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   rpn_nms_threshold = cfg.FLAGS.rpn_nms_threshold
   pre_nms_top_n = cfg.FLAGS.pre_nms_top_n
   post_nms_top_n = cfg.FLAGS.post_nms_top_n
+
+  # training: 12000, 2000
+  # testing: 6000, 400
   if not is_training:
     pre_nms_top_n = int(pre_nms_top_n / 2)
-    post_nms_top_n = int(post_nms_top_n / 2)
+    post_nms_top_n = int(post_nms_top_n / 5)
     
   boxes = boxes.reshape((-1, 4))
   scores = scores.reshape((-1, 1))
+  assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
   
   # filter backgrounds
   # Hope this will filter most of background anchors, since a argsort is too slow..
@@ -58,24 +64,63 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   scores = scores[keeps]
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 
+  # # random sample boxes
+  ## try early sample later
+  # fg_inds = np.where(scores > 0.5)[0]
+  # num_fgs = min(len(fg_inds.size), int(rois_per_image * fg_roi_fraction))
+
   if _DEBUG:
-    LOG('SAMPLE: %d rois has been choosen' % len(keeps))
+    LOG('SAMPLE: %d rois has been choosen' % len(scores))
     LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
+    LOG('SAMPLE: a negative box: %d %d %d %d %.4f' % (boxes[-1, 0], boxes[-1, 1], boxes[-1, 2], boxes[-1, 3], scores[-1]))
     hs = boxes[:, 3] - boxes[:, 1]
     ws = boxes[:, 2] - boxes[:, 0]
     assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
   
-  return boxes, scores, batch_inds
+  return boxes, scores.astype(np.float32), batch_inds
 
 def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, only_positive=False):
     """sample boxes for refined output"""
     boxes, scores, batch_inds = sample_rpn_outputs(boxes, scores, is_training, only_positive)
 
-    if is_training and gt_boxes.size > 0:
-        boxes = np.vstack((boxes, _jitter_boxes(gt_boxes[:, :4])))
-        scores = np.vstack((scores, np.ones((gt_boxes.shape[0], 1), dtype=np.float32)))
+    if gt_boxes.size > 0:
+        overlaps = cython_bbox.bbox_overlaps(
+                np.ascontiguousarray(boxes[:, 0:4], dtype=np.float),
+                np.ascontiguousarray(gt_boxes[:, 0:4], dtype=np.float))
+        gt_assignment = overlaps.argmax(axis=1) # B
+        max_overlaps = overlaps[np.arange(boxes.shape[0]), gt_assignment] # B
+        fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
 
-    return boxes, scores
+        mask_fg_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
+        if mask_fg_inds.size > cfg.FLAGS.masks_per_image:
+            mask_fg_inds = np.random.choice(mask_fg_inds, size=cfg.FLAGS.masks_per_image, replace=False)
+
+        if True:
+            gt_argmax_overlaps = overlaps.argmax(axis=0) # G
+            fg_inds = np.union1d(gt_argmax_overlaps, fg_inds)
+
+	fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
+      	if fg_inds.size > 0 and fg_rois < fg_inds.size:
+       	   fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
+      	
+	# TODO: sampling strategy
+      	bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
+      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 64)
+      	if bg_inds.size > 0 and bg_rois < bg_inds.size:
+           bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
+
+	keep_inds = np.append(fg_inds, bg_inds)
+    else:
+        bg_inds = np.arange(boxes.shape[0])
+        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 64)
+        if bg_rois < bg_inds.size:
+            bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
+
+        keep_inds = bg_inds
+        mask_fg_inds = np.arange(0)
+    
+    return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds],\
+           boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds]
 
 def _jitter_boxes(boxes, jitter=0.1):
     """ jitter the boxes before appending them into rois

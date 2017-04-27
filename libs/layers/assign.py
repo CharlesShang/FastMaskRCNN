@@ -44,5 +44,3 @@ def assign_boxes(gt_boxes, min_k=2, max_k=5):
 
     else:
         return np.asarray([], dtype=np.int32)
-
-

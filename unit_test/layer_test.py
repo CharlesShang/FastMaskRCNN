@@ -61,7 +61,7 @@ class anchor_test(layer_test):
     def test(self):
         cfg.FLAGS.fg_threshold = 0.7
         with tf.Session() as sess:
-            all_anchors = gen_all_anchors(self.height / 4, self.width / 4, stride = 4)
+            all_anchors = gen_all_anchors(self.height / 4, self.width / 4, stride = 4, scales = 2**np.arange(1,5))
             all_anchors = tf.reshape(all_anchors, [-1, 4])
             self.all_anchors =  np.reshape(all_anchors.eval(), (-1, 4))
             labels, bbox_targets, bbox_inside_weights = \
@@ -98,9 +98,11 @@ class anchor_test(layer_test):
             npscores = scores.eval().reshape((-1, 1))
             self.npboxes = np.hstack((self.npboxes, npscores))
             # print (self.npboxes.shape, npscores.shape)
+            bbox_targets_np = self.bbox_targets.reshape([-1, 4])
+            all_anchors_np = all_anchors.eval().reshape([-1, 4])
             for i in range(self.npboxes.shape[0]):
                 if self.npboxes[i, 4] >= 1:
-                    print (self.npboxes[i])
+                    print (bbox_targets_np[i], self.npboxes[i], all_anchors_np[i])
 
 class roi_test(layer_test):
 
@@ -199,7 +201,7 @@ class sample_test(layer_test):
             boxes = np.hstack((boxes, boxes + s)).astype(np.float32)
 
             scores = np.random.rand(self.N, 1).astype(np.float32)
-            boxes, scores = \
+            boxes, scores, batch_inds= \
                     sample_rpn_outputs(boxes, scores, is_training=False,) 
             self.boxes = boxes.eval()
             self.scores = scores.eval()
@@ -232,7 +234,9 @@ class ROIAlign_test(layer_test):
             img = tf.constant(npimg)
             pooled_height = 5
             pooled_width = 5
-            feats = ROIAlign(img, boxes, False, stride=stride, pooled_height=pooled_height, pooled_width=pooled_width,)
+            batch_inds = np.zeros((self.N, ), dtype=np.int32)
+            batch_inds = tf.convert_to_tensor(batch_inds)
+            feats = ROIAlign(img, boxes, batch_inds, stride=stride, pooled_height=pooled_height, pooled_width=pooled_width,)
             self.feats = feats.eval()
             print (self.feats.shape)
             print (self.feats.reshape((self.N, pooled_height, pooled_width)))
@@ -247,16 +251,23 @@ class assign_test(layer_test):
         s = np.random.randint(30, int(self.width/1), (self.N, 2))
         c = np.random.randint(1, self.num_classes, (self.N, 1))
         self.gt_boxes = np.hstack((self.gt_boxes, self.gt_boxes + s, c))
+        batch_inds = np.zeros((self.N, ), np.int32)
         with tf.Session() as sess:
-            [b1, b2, b3, b4, inds] = assign_boxes(self.gt_boxes, 
-                    [2,3,4,5])
-            b1n, b2n, b3n, b4n, indsn = \
-                    sess.run([b1, b2, b3, b4, inds])
+
+            batch_inds = tf.convert_to_tensor(batch_inds)
+            [assigned_boxes, assigned_batch, inds] = \
+                assign_boxes(self.gt_boxes, [self.gt_boxes, batch_inds], [2,3,4,5])
+            [b1, b2, b3, b4] = assigned_boxes
+            [ind1, ind2, ind3, ind4] = assigned_batch
+            b1n, b2n, b3n, b4n, indsn, ind1n, ind2n, ind3n, ind4n= \
+                    sess.run([b1, b2, b3, b4, inds, ind1, ind2, ind3, ind4])
             print (b1n)
             print (b2n)
             print (b3n)
             print (b4n)
             print (np.hstack((self.gt_boxes, indsn[:, np.newaxis])))
+
+            print (ind1n, ind2n, ind3n, ind4n)
 
 if __name__ == '__main__':
     print ('##############################')
@@ -288,7 +299,9 @@ if __name__ == '__main__':
     print ('##############################')
     print ('ROIAlign Test')
     print ('##############################')
-    c_test  = ROIAlign_test(5, 4, 100, 100)
+    c_test  = ROIAlign_test(8, 4, 100, 100)
+    c_test.test()
+    c_test  = ROIAlign_test(0, 4, 100, 100)
     c_test.test()
     print ('##############################')
     print ('Assign Test')

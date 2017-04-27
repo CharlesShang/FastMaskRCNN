@@ -75,7 +75,7 @@ tf.app.flags.DEFINE_integer(
 ######################
 
 tf.app.flags.DEFINE_float(
-    'weight_decay', 0.00004, 'The weight decay on the model weights.')
+    'weight_decay', 0.00005, 'The weight decay on the model weights.')
 
 tf.app.flags.DEFINE_string(
     'optimizer', 'momentum',
@@ -222,6 +222,13 @@ tf.app.flags.DEFINE_boolean(
 #######################
 # BOX Flags #
 #######################
+tf.app.flags.DEFINE_float(
+    'rpn_bg_threshold', 0.3,
+    'Only regions which intersection is larger than fg_threshold are considered to be fg')
+
+tf.app.flags.DEFINE_float(
+    'rpn_fg_threshold', 0.7,
+    'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
     'fg_threshold', 0.5,
@@ -232,7 +239,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
-    'rois_per_image', 128,
+    'rois_per_image', 256,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
@@ -256,11 +263,11 @@ tf.app.flags.DEFINE_integer(
 ##################################
 
 tf.app.flags.DEFINE_integer(
-    'pre_nms_top_n', 3000,
+    'pre_nms_top_n', 12000,
     'Number of rpn anchors that should be sampled before nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_top_n', 128,
+    'post_nms_top_n', 2000,
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_float(
@@ -279,11 +286,11 @@ tf.app.flags.DEFINE_float(
     'mask_threshold', 0.50,
     'Least intersection of a positive mask')
 tf.app.flags.DEFINE_integer(
-    'masks_per_image', 300,
+    'masks_per_image', 64,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
-    'min_size', 8,
+    'min_size', 2,
     'minimum size of an object')
 
 FLAGS = tf.app.flags.FLAGS

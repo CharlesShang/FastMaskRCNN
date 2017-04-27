@@ -27,7 +27,7 @@ FLAGS = tf.app.flags.FLAGS
 with tf.Graph().as_default():
 
   image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = \
-    coco.read('./data/coco/records/coco_train2014_00000-of-00040.tfrecord')
+    coco.read('./data/coco/records/coco_trainval2014_00000-of-00048.tfrecord')
   
   image, gt_boxes, gt_masks = \
     preprocess_coco.preprocess_image(image, gt_boxes, gt_masks)
