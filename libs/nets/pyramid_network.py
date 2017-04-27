@@ -91,9 +91,9 @@ def _smooth_l1_dist(x, y, sigma2=9.0, name='smooth_l1_dist'):
     return tf.square(deltas) * 0.5 * sigma2 * smoothL1_sign + \
            (deltas_abs - 0.5 / sigma2) * tf.abs(smoothL1_sign - 1)
 
-def _get_valid_sample_fraction(labels):
+def _get_valid_sample_fraction(labels, p=0):
     """return fraction of non-negative examples, the ignored examples have been marked as negative"""
-    num_valid = tf.reduce_sum(tf.cast(tf.greater_equal(labels, 0), tf.float32))
+    num_valid = tf.reduce_sum(tf.cast(tf.greater_equal(labels, p), tf.float32))
     num_example = tf.cast(tf.size(labels), tf.float32)
     frac = tf.cond(tf.greater(num_example, 0), lambda:num_valid / num_example,  
             lambda: tf.cast(0, tf.float32))
@@ -219,7 +219,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.001), activation_fn=my_sigmoid)
           cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
-                  weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
+                  weights_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
           anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)]
           all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
@@ -240,12 +240,14 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         # outputs['rpn'] = {'box': rpn_boxes, 'cls': rpn_clses, 'anchor': rpn_anchors}
         
         rpn_probs = tf.nn.softmax(tf.reshape(rpn_clses, [-1, 2]))
-        rois, scores, batch_inds = anchor_decoder(rpn_boxes, rpn_probs, rpn_anchors, ih, iw)
-        rois, scores, batch_inds = sample_rpn_outputs(rois, scores)
+        rois, roi_clses, scores, = anchor_decoder(rpn_boxes, rpn_probs, rpn_anchors, ih, iw)
+        # rois, scores, batch_inds = sample_rpn_outputs(rois, rpn_probs[:, 1])
+        rois, scores, batch_inds, mask_rois, mask_scores, mask_batch_inds = \
+                sample_rpn_outputs_with_gt(rois, rpn_probs[:, 1], gt_boxes, is_training=is_training)
 
-        if is_training:
-            # rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes)
-            rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.2)
+        # if is_training:
+        #     # rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes)
+        #     rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.2)
         
         outputs['roi'] = {'box': rois, 'score': scores}
 
@@ -263,7 +265,8 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         cropped_rois = tf.concat(values=cropped_rois, axis=0)
 
         outputs['roi']['cropped_rois'] = cropped_rois
-          
+        tf.add_to_collection('__CROPPED__', cropped_rois)
+
         ## refine head
         # to 7 x 7
         cropped_regions = slim.max_pool2d(cropped_rois, [3, 3], stride=2, padding='SAME')
@@ -273,12 +276,12 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         refine = slim.fully_connected(refine,  1024, activation_fn=tf.nn.relu)
         refine = slim.dropout(refine, keep_prob=0.75, is_training=is_training)
         cls2 = slim.fully_connected(refine, num_classes, activation_fn=None, 
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.01))
         box = slim.fully_connected(refine, num_classes*4, activation_fn=my_sigmoid, 
                 weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
 
         outputs['refined'] = {'box': box, 'cls': cls2}
-          
+        
         ## decode refine net outputs
         cls2_prob = tf.nn.softmax(cls2)
         final_boxes, classes, scores = \
@@ -303,7 +306,8 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         for _ in range(4):
             m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu)
         # to 28 x 28
-        m = slim.conv2d_transpose(m, 256, [2, 2], stride=2, padding='VALID', activation_fn=tf.nn.relu)
+        m = slim.conv2d_transpose(m, 256, 2, stride=2, padding='VALID', activation_fn=tf.nn.relu)
+        tf.add_to_collection('__TRANSPOSED__', m)
         m = slim.conv2d(m, num_classes, [1, 1], stride=1, padding='VALID', activation_fn=None)
           
         # add a mask, given the predicted boxes and classes
@@ -424,7 +428,7 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
                     tf.reshape(bbox_targets, [-1, num_classes * 4]),
                     tf.reshape(bbox_inside_weights, [-1, num_classes * 4])
                     ] )
-        # frac, frac_ = _get_valid_sample_fraction(labels)
+        # frac, frac_ = _get_valid_sample_fraction(labels, 1)
         refine_batch.append(
                 tf.reduce_sum(tf.cast(
                     tf.greater_equal(labels, 0), tf.float32

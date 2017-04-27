@@ -107,7 +107,7 @@ def train():
             base_anchors=9,
             is_training=True,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
-            loss_weights=[0.1, 0.2, 1.0, 0.1, 0.5])
+            loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
 
 
     total_loss = outputs['total_loss'] 
@@ -119,6 +119,9 @@ def train():
     global_step = slim.create_global_step()
     update_op = solve(global_step)
 
+    cropped_rois = tf.get_collection('__CROPPED__')[0]
+    transposed = tf.get_collection('__TRANSPOSED__')[0]
+    
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     init_op = tf.group(
@@ -152,8 +155,8 @@ def train():
                      sess.run([update_op, total_loss, regular_loss, img_id] + 
                               losses + 
                               [gt_boxes] + 
-                              batch_info)
-        
+                              batch_info )
+
         duration_time = time.time() - start_time
         if step % 1 == 0: 
             print ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
