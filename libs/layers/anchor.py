@@ -31,21 +31,25 @@ def encode(gt_boxes, all_anchors, height, width, stride):
   bbox_inside_weights: N x (4), in {0, 1} indicating to which class is assigned.
   """
   # TODO: speedup this module
-  if all_anchors is None:
-    all_anchors = anchors_plane(height, width, stride=stride)
+  # if all_anchors is None:
+  #   all_anchors = anchors_plane(height, width, stride=stride)
 
-  # anchors, inds_inside, total_anchors
-  border = cfg.FLAGS.allow_border
-  all_anchors = all_anchors.reshape((-1, 4))
-  inds_inside = np.where(
-    (all_anchors[:, 0] >= -border) &
-    (all_anchors[:, 1] >= -border) &
-    (all_anchors[:, 2] < (width * stride) + border) &
-    (all_anchors[:, 3] < (height * stride) + border))[0]
-  anchors = all_anchors[inds_inside, :]
+  # # anchors, inds_inside, total_anchors
+  # border = cfg.FLAGS.allow_border
+  # all_anchors = all_anchors.reshape((-1, 4))
+  # inds_inside = np.where(
+  #   (all_anchors[:, 0] >= -border) &
+  #   (all_anchors[:, 1] >= -border) &
+  #   (all_anchors[:, 2] < (width * stride) + border) &
+  #   (all_anchors[:, 3] < (height * stride) + border))[0]
+  # anchors = all_anchors[inds_inside, :]
+  all_anchors = all_anchors.reshape([-1, 4])
+  anchors = all_anchors
   total_anchors = all_anchors.shape[0]
 
-  labels = np.zeros((anchors.shape[0], ), dtype=np.float32)
+  # labels = np.zeros((anchors.shape[0], ), dtype=np.float32)
+  labels = np.empty((anchors.shape[0], ), dtype=np.float32)
+  labels.fill(-1)
 
   if gt_boxes.size > 0:
       overlaps = cython_bbox.bbox_overlaps(
@@ -58,10 +62,12 @@ def encode(gt_boxes, all_anchors, height, width, stride):
       #     print ('overlaps shape: ', overlaps.shape)
 
       gt_assignment = overlaps.argmax(axis=1)  # (A)
-      max_overlaps = overlaps[np.arange(len(inds_inside)), gt_assignment]
+      max_overlaps = overlaps[np.arange(total_anchors), gt_assignment]
       gt_argmax_overlaps = overlaps.argmax(axis=0)  # G
       gt_max_overlaps = overlaps[gt_argmax_overlaps,
                                  np.arange(overlaps.shape[1])]
+
+      labels[max_overlaps < cfg.FLAGS.rpn_bg_threshold] = 0
       
       if True:
         # this is sentive to boxes of little overlaps, no need!
@@ -72,8 +78,8 @@ def encode(gt_boxes, all_anchors, height, width, stride):
 
         # exclude examples with little overlaps
         # added later
-        excludes = np.where(gt_max_overlaps < cfg.FLAGS.bg_threshold)[0]
-        labels[gt_argmax_overlaps[excludes]] = -1
+        # excludes = np.where(gt_max_overlaps < cfg.FLAGS.bg_threshold)[0]
+        # labels[gt_argmax_overlaps[excludes]] = -1
 
         if _DEBUG:
            min_ov = np.min(gt_max_overlaps)
@@ -90,7 +96,7 @@ def encode(gt_boxes, all_anchors, height, width, stride):
            
 
       # fg label: above threshold IOU
-      labels[max_overlaps >= cfg.FLAGS.fg_threshold] = 1
+      labels[max_overlaps >= cfg.FLAGS.rpn_fg_threshold] = 1
       # print (np.min(labels), np.max(labels))
 
       # subsample positive labels if there are too many
@@ -112,16 +118,16 @@ def encode(gt_boxes, all_anchors, height, width, stride):
     disable_inds = np.random.choice(bg_inds, size=(len(bg_inds) - num_bg), replace=False)
     labels[disable_inds] = -1
 
-  bbox_targets = np.zeros((len(inds_inside), 4), dtype=np.float32)
+  bbox_targets = np.zeros((total_anchors, 4), dtype=np.float32)
   if gt_boxes.size > 0:
     bbox_targets = _compute_targets(anchors, gt_boxes[gt_assignment, :])
-  bbox_inside_weights = np.zeros((len(inds_inside), 4), dtype=np.float32)
-  bbox_inside_weights[labels == 1, :] = 1
+  bbox_inside_weights = np.zeros((total_anchors, 4), dtype=np.float32)
+  bbox_inside_weights[labels == 1, :] = 0.1
 
-  # mapping to whole outputs
-  labels = _unmap(labels, total_anchors, inds_inside, fill=-1)
-  bbox_targets = _unmap(bbox_targets, total_anchors, inds_inside, fill=0)
-  bbox_inside_weights = _unmap(bbox_inside_weights, total_anchors, inds_inside, fill=0)
+  # # mapping to whole outputs
+  # labels = _unmap(labels, total_anchors, inds_inside, fill=-1)
+  # bbox_targets = _unmap(bbox_targets, total_anchors, inds_inside, fill=0)
+  # bbox_inside_weights = _unmap(bbox_inside_weights, total_anchors, inds_inside, fill=0)
 
   labels = labels.reshape((1, height, width, -1))
   bbox_targets = bbox_targets.reshape((1, height, width, -1))

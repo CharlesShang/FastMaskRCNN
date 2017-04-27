@@ -57,7 +57,7 @@ def encode(gt_boxes, rois, num_classes):
       
       # TODO: sampling strategy
       bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 4)
+      bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 64)
       if bg_inds.size > 0 and bg_rois < bg_inds.size:
         bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
       labels[bg_inds] = 0
@@ -91,7 +91,7 @@ def encode(gt_boxes, rois, num_classes):
       labels = np.zeros((num_rois, ), np.float32)
       bbox_targets = np.zeros((num_rois, 4 * num_classes), np.float32)
       bbox_inside_weights = np.zeros((num_rois, 4 * num_classes), np.float32)
-      bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 8)
+      bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 64)
       if bg_rois < num_rois:
           bg_inds = np.arange(num_rois)
           ignore_inds = np.random.choice(bg_inds, size=num_rois - bg_rois, replace=False)
