@@ -58,5 +58,5 @@ If you use this implementation in your work, please cite the following:
 ```
 
 ## License
-See [LICENSE][LICENSE] for details.
+See [LICENSE][license] for details.
 
