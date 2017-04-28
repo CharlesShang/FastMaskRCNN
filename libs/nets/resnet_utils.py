@@ -40,7 +40,8 @@ from __future__ import print_function
 import collections
 import tensorflow as tf
 
-slim = tf.contrib.slim
+# slim = tf.contrib.slim
+import tensorflow.contrib.slim as slim
 
 
 class Block(collections.namedtuple('Block', ['scope', 'unit_fn', 'args'])):
