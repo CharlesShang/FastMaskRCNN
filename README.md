@@ -2,8 +2,7 @@
 Mask RCNN in TensorFlow
 
 This repo attempts to reproduce this amazing work by Kaiming He et al.
-
-[Mask RCNN](https://arxiv.org/abs/1703.06870).
+[Mask R-CNN](https://arxiv.org/abs/1703.06870).
 
 ## Requirements
 
