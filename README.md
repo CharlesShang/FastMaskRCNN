@@ -58,5 +58,5 @@ If you use this implementation in your work, please cite the following:
 ```
 
 ## License
-See [LICENSE][license] for details.
+See [LICENSE][https://github.com/CharlesShang/FastMaskRCNN/blob/master/LICENSE] for details.
 
