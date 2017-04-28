@@ -1,7 +1,16 @@
 # Mask RCNN
 Mask RCNN in TensorFlow
-This repo attempts to reproduce this amazing work by Kaiming He.
+
+This repo attempts to reproduce this amazing work by Kaiming He et al.
+
 [Mask RCNN](https://arxiv.org/abs/1703.06870).
+
+## Requirements
+
+- [Tensorflow (>= 1.0.0)](https://www.tensorflow.org/install/install_linux)
+- [Numpy](https://github.com/numpy/numpy/blob/master/INSTALL.rst.txt)
+- [COCO dataset](http://mscoco.org/dataset/#download)
+- [Resnet50](http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz)
 
 ## How-to
 1. Download [COCO](http://mscoco.org/dataset/#download) dataset, place it into `./data`, then run `python download_and_convert_data.py` to build tf-records. It takes a while.
@@ -28,5 +37,24 @@ This repo attempts to reproduce this amazing work by Kaiming He.
 ## Call for contributions
 - Anything helps this repo, including **discussion**, **testing**, **promotion** and of course **your awesome code**.
 
+## Citation
+If you use this implementation in your work, please cite the following:
+
+```
+@misc{shang2017fastmaskrcnn,
+  author = {Chong Shang},
+  title = {FastMaskRCNN},
+  year = {2017},
+  howpublished = {\url{https://github.com/CharlesShang/FastMaskRCNN}},
+  note = {commit xxxxxxx}
+}
+```
 ## Acknowledgment
-This repo borrows tons of code from [TFFRCNN](https://github.com/CharlesShang/TFFRCNN), [py-faster-rcnn](https://github.com/rbgirshick/py-faster-rcnn), [faster_rcnn](https://github.com/ShaoqingRen/faster_rcnn), [tf-models](https://github.com/tensorflow/models)
+This repo borrows tons of code from 
+- [TFFRCNN](https://github.com/CharlesShang/TFFRCNN)
+- [py-faster-rcnn](https://github.com/rbgirshick/py-faster-rcnn) 
+- [faster_rcnn](https://github.com/ShaoqingRen/faster_rcnn)
+- [tf-models](https://github.com/tensorflow/models)
+
+## License
+MIT
