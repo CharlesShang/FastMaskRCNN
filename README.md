@@ -44,19 +44,6 @@ This repo borrows tons of code from
 - [faster_rcnn](https://github.com/ShaoqingRen/faster_rcnn)
 - [tf-models](https://github.com/tensorflow/models)
 
-## Citation
-If you use this implementation in your work, please cite the following:
-
-```
-@misc{shang2017fastmaskrcnn,
-  author = {Chong Shang},
-  title = {FastMaskRCNN},
-  year = {2017},
-  howpublished = {\url{https://github.com/CharlesShang/FastMaskRCNN}},
-  note = {commit xxxxxxx}
-}
-```
-
 ## License
 See [LICENSE](https://github.com/CharlesShang/FastMaskRCNN/blob/master/LICENSE) for details.
 
