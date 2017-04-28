@@ -63,6 +63,20 @@ def solve(global_step):
 
 def restore(sess):
      """choose which param to restore"""
+     if FLAGS.restore_previous_if_exists:
+        try:
+            checkpoint_path = tf.train.latest_checkpoint(FLAGS.train_dir)
+            restorer = tf.train.Saver()
+            restorer.restore(sess, checkpoint_path)
+            print ('restored previous model %s from %s'\
+                    %(checkpoint_path, FLAGS.train_dir))
+            time.sleep(2)
+            return
+        except:
+            print ('--restore_previous_if_exists is set, but failed to restore in %s %s'\
+                    % (FLAGS.train_dir, checkpoint_path))
+            time.sleep(2)
+
      if FLAGS.pretrained_model:
         if tf.gfile.IsDirectory(FLAGS.pretrained_model):
             checkpoint_path = tf.train.latest_checkpoint(FLAGS.pretrained_model)
@@ -194,9 +208,9 @@ def train():
             summary_str = sess.run(summary_op)
             summary_writer.add_summary(summary_str, step)
 
-        if (step % 1000 == 0 or step + 1 == FLAGS.max_iters) and step != 0:
+        if (step % 10000 == 0 or step + 1 == FLAGS.max_iters) and step != 0:
             checkpoint_path = os.path.join(FLAGS.train_dir, 
-                                           FLAGS.dataset_name + '_model.ckpt')
+                                           FLAGS.dataset_name + '_' + FLAGS.network + '_model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 
         if coord.should_stop():

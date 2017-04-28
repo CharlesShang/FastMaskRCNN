@@ -67,7 +67,7 @@ tf.app.flags.DEFINE_integer(
     'The frequency with which the model is saved, in seconds.')
 
 tf.app.flags.DEFINE_integer(
-    'max_iters', 1500000,
+    'max_iters', 2500000,
     'max iterations')
 
 ######################
@@ -217,6 +217,10 @@ tf.app.flags.DEFINE_string(
 
 tf.app.flags.DEFINE_boolean(
     'ignore_missing_vars', False,
+    'When restoring a checkpoint would ignore missing variables.')
+
+tf.app.flags.DEFINE_boolean(
+    'restore_previous_if_exists', True,
     'When restoring a checkpoint would ignore missing variables.')
 
 #######################
