@@ -46,7 +46,7 @@ tf.app.flags.DEFINE_string(
     'The name of the train/test/val split.')
 
 tf.app.flags.DEFINE_string(
-    'dataset_dir', '/data/MSCOCO/',
+    'dataset_dir', './data/coco/',
     'The directory where the dataset files are stored.')
 
 tf.app.flags.DEFINE_integer(
