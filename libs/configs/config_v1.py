@@ -11,6 +11,10 @@ tf.app.flags.DEFINE_string(
     'train_dir', './output/mask_rcnn/',
     'Directory where checkpoints and event logs are written to.')
 
+tf.app.flags.DEFINE_integer(
+    'train_checkpoint_interval', 3000,
+    'The number of steps per saved checkpoint.')
+
 tf.app.flags.DEFINE_string(
     'pretrained_model', './data/pretrained_models/resnet_v1_50.ckpt',
     'Path to pretrained model')
@@ -42,7 +46,7 @@ tf.app.flags.DEFINE_string(
     'The name of the train/test/val split.')
 
 tf.app.flags.DEFINE_string(
-    'dataset_dir', 'data/coco/',
+    'dataset_dir', '/data/MSCOCO/',
     'The directory where the dataset files are stored.')
 
 tf.app.flags.DEFINE_integer(
@@ -130,7 +134,7 @@ tf.app.flags.DEFINE_string(
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.002,
+tf.app.flags.DEFINE_float('learning_rate', 2e-3
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -143,8 +147,8 @@ tf.app.flags.DEFINE_float(
 tf.app.flags.DEFINE_float(
     'learning_rate_decay_factor', 0.94, 'Learning rate decay factor.')
 
-tf.app.flags.DEFINE_float(
-    'num_epochs_per_decay', 2.0,
+tf.app.flags.DEFINE_integer(
+    'num_epochs_per_decay', 2,
     'Number of epochs after which learning rate decays.')
 
 tf.app.flags.DEFINE_bool(
