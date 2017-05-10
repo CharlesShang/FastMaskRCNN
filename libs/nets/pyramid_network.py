@@ -18,7 +18,7 @@ from libs.layers import ROIAlign
 from libs.layers import sample_rpn_outputs
 from libs.layers import sample_rpn_outputs_with_gt
 from libs.layers import assign_boxes
-from libs.visualization.summary_utils import visualize_predictions
+from libs.visualization.summary_utils import visualize_bb, visualize_final_predictions
 
 # mapping each stage to its' tensor features
 _networks_map = {
@@ -287,7 +287,9 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         cls2_prob = tf.nn.softmax(cls2)
         final_boxes, classes, scores = \
                 roi_decoder(box, cls2_prob, rois, ih, iw)
-         
+
+        outputs['final_boxes'] = {'box': final_boxes, 'cls': classes}
+
         ## for testing, maskrcnn takes refined boxes as inputs
         if not is_training:
           rois = final_boxes
@@ -544,8 +546,11 @@ def build(end_points, image_height, image_width, pyramid_map,
     outputs['pred_classes'] = pred_classes
     outputs['pred_masks'] = pred_masks
 
-    # TODO: uncomment when method decode_output is fixed
-    # visualize_predictions(pred_boxes, end_points["input"], pred_masks)
+    # rpn visualization
+    visualize_bb(end_points["input"], outputs['roi']["box"], name="rpn_bb_visualization")
 
-
+    # final network visualization
+    first_mask = outputs['mask']['mask'][:1]
+    first_mask = tf.transpose(first_mask, [3, 1, 2, 0])
+    visualize_final_predictions(outputs['final_boxes']["box"], end_points["input"], first_mask)
     return outputs
