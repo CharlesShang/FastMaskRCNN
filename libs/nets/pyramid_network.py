@@ -18,6 +18,7 @@ from libs.layers import ROIAlign
 from libs.layers import sample_rpn_outputs
 from libs.layers import sample_rpn_outputs_with_gt
 from libs.layers import assign_boxes
+from libs.visualization.summary_utils import visualize_predictions
 
 # mapping each stage to its' tensor features
 _networks_map = {
@@ -542,5 +543,9 @@ def build(end_points, image_height, image_width, pyramid_map,
     outputs['pred_boxes'] = pred_boxes
     outputs['pred_classes'] = pred_classes
     outputs['pred_masks'] = pred_masks
+
+    # TODO: uncomment when method decode_output is fixed
+    # visualize_predictions(pred_boxes, end_points["input"], pred_masks)
+
 
     return outputs
