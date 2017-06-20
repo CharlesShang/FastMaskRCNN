@@ -112,7 +112,7 @@ def train():
                              FLAGS.dataset_dir, 
                              FLAGS.im_batch,
                              is_training=True)
-    
+
     data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16,
             dtypes=(
                 image.dtype, ih.dtype, iw.dtype, 
@@ -136,7 +136,7 @@ def train():
             loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
 
 
-    total_loss = outputs['total_loss'] 
+    total_loss = outputs['total_loss']
     losses  = outputs['losses']
     batch_info = outputs['batch_info']
     regular_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
@@ -207,6 +207,7 @@ def train():
         if step % 100 == 0:
             summary_str = sess.run(summary_op)
             summary_writer.add_summary(summary_str, step)
+            summary_writer.flush()
 
         if (step % 10000 == 0 or step + 1 == FLAGS.max_iters) and step != 0:
             checkpoint_path = os.path.join(FLAGS.train_dir, 
