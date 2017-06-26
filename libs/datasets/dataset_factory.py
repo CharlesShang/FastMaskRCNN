@@ -19,7 +19,7 @@ def get_dataset(dataset_name, split_name, dataset_dir,
     image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = coco.read(tfrecords)
 
     image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training)
-    visualize_input(gt_boxes, image, tf.expand_dims(gt_masks, axis=3))
+    #visualize_input(gt_boxes, image, tf.expand_dims(gt_masks, axis=3))
 
     return image, ih, iw, gt_boxes, gt_masks, num_instances, img_id
 

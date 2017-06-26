@@ -69,13 +69,13 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   # fg_inds = np.where(scores > 0.5)[0]
   # num_fgs = min(len(fg_inds.size), int(rois_per_image * fg_roi_fraction))
 
-  if _DEBUG:
-    LOG('SAMPLE: %d rois has been choosen' % len(scores))
-    LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
-    LOG('SAMPLE: a negative box: %d %d %d %d %.4f' % (boxes[-1, 0], boxes[-1, 1], boxes[-1, 2], boxes[-1, 3], scores[-1]))
-    hs = boxes[:, 3] - boxes[:, 1]
-    ws = boxes[:, 2] - boxes[:, 0]
-    assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
+  # if _DEBUG:
+  #   LOG('SAMPLE: %d rois has been choosen' % len(scores))
+  #   LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
+  #   LOG('SAMPLE: a negative box: %d %d %d %d %.4f' % (boxes[-1, 0], boxes[-1, 1], boxes[-1, 2], boxes[-1, 3], scores[-1]))
+  #   hs = boxes[:, 3] - boxes[:, 1]
+  #   ws = boxes[:, 2] - boxes[:, 0]
+  #   assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
   
   return boxes, scores.astype(np.float32), batch_inds
 
@@ -90,6 +90,21 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
         gt_assignment = overlaps.argmax(axis=1) # B
         max_overlaps = overlaps[np.arange(boxes.shape[0]), gt_assignment] # B
         fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
+        if _DEBUG and np.argmax(overlaps[fg_inds],axis=1).size < gt_boxes.size/5.0:
+            print("gt_size")
+            print(gt_boxes)
+            gt_height = (gt_boxes[:,2]-gt_boxes[:,0])
+            gt_width = (gt_boxes[:,3]-gt_boxes[:,1])
+            gt_dim = np.vstack((gt_height, gt_width))
+            print(np.transpose(gt_dim))
+            #print(gt_height)
+            #print(gt_width)
+
+            print('SAMPLE: %d after overlaps by %s' % (len(fg_inds),cfg.FLAGS.fg_threshold))
+            print("detected object no.")
+            print(np.argmax(overlaps[fg_inds],axis=1))
+            print("total object")
+            print(gt_boxes.size/5.0)
 
         mask_fg_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
         if mask_fg_inds.size > cfg.FLAGS.masks_per_image:
@@ -105,19 +120,22 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
       	
 	# TODO: sampling strategy
       	bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 64)
+      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8)#64
       	if bg_inds.size > 0 and bg_rois < bg_inds.size:
            bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
-	keep_inds = np.append(fg_inds, bg_inds)
+        keep_inds = np.append(fg_inds, bg_inds)
+        #print(gt_boxes[np.argmax(overlaps[fg_inds],axis=1),4])
     else:
         bg_inds = np.arange(boxes.shape[0])
-        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 64)
+        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 8)#64
         if bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
         keep_inds = bg_inds
         mask_fg_inds = np.arange(0)
+
+    
     
     return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds],\
            boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds]

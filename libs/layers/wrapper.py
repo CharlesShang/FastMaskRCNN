@@ -175,3 +175,28 @@ def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
             assigned_tensors.append(split_tensors)
 
         return assigned_tensors + [assigned_layers]
+
+def assign_boxes_(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
+
+    with tf.name_scope(scope) as sc:
+        min_k = layers[0]
+        max_k = layers[-1]
+        assigned_layers = \
+            tf.py_func(assign.assign_boxes, 
+                     [ gt_boxes, min_k, max_k ],
+                     tf.int32)
+        assigned_layers = tf.reshape(assigned_layers, [-1])
+
+        assigned_tensors = []
+        for t in tensors:
+            split_tensors = []
+            for l in layers:
+                tf.cast(l, tf.int32)
+                inds = tf.where(tf.equal(assigned_layers, l))
+                inds = tf.reshape(inds, [-1])
+                split_tensors.append(tf.gather(t, inds))
+            assigned_tensors.append(split_tensors)
+
+        ordered_cropped_rois = tf.concat([assigned_tensors[0][3],assigned_tensors[0][2],assigned_tensors[0][1],assigned_tensors[0][0]],0)
+
+        return [ordered_cropped_rois] + assigned_tensors + [assigned_layers]
