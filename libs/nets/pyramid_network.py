@@ -19,7 +19,6 @@ from libs.layers import ROIAlign_
 from libs.layers import sample_rpn_outputs
 from libs.layers import sample_rpn_outputs_with_gt
 from libs.layers import assign_boxes
-from libs.layers import assign_boxes_
 from libs.visualization.summary_utils import visualize_bb, visualize_final_predictions, visualize_input
 
 _TRAIN_MASK = True
@@ -290,7 +289,6 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
             
         cropped_rois = tf.concat(values=cropped_rois, axis=0)
         ordered_rois = tf.concat(values=ordered_rois, axis=0)
-        #pyramid_feature = tf.concat(values=pyramid_feature, axis=0)
 
 
         outputs['ordered_rois'] = ordered_rois
@@ -339,7 +337,9 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
             cropped = ROIAlign(pyramid[p], splitted_rois, batch_inds, stride=2**i,
                                pooled_height=14, pooled_width=14)
             cropped_rois.append(cropped)
+            ordered_rois.append(splitted_rois)
           cropped_rois = tf.concat(values=cropped_rois, axis=0)
+          ordered_rois = tf.concat(values=ordered_rois, axis=0)
           
         ## mask head
         m = cropped_rois
