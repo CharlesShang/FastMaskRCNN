@@ -533,12 +533,11 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         # mask_binary_loss = mask_lw * tf.losses.softmax_cross_entropy(mask_targets, masks)
         # NOTE: w/o competition between classes. 
         mask_targets = tf.cast(mask_targets, tf.float32)
-        if _TRAIN_MASK is True:
-            mask_loss = mask_lw * tf.nn.sigmoid_cross_entropy_with_logits(labels=mask_targets, logits=masks) 
-            mask_loss = tf.reduce_mean(mask_loss) 
-            mask_loss = tf.cond(tf.greater(tf.size(labels), 0), lambda: mask_loss, lambda: tf.constant(0.0))
-            tf.add_to_collection(tf.GraphKeys.LOSSES, mask_loss)
-            mask_losses.append(mask_loss)
+        mask_loss = mask_lw * tf.nn.sigmoid_cross_entropy_with_logits(labels=mask_targets, logits=masks) 
+        mask_loss = tf.reduce_mean(mask_loss) 
+        mask_loss = tf.cond(tf.greater(tf.size(labels), 0), lambda: mask_loss, lambda: tf.constant(0.0))
+        tf.add_to_collection(tf.GraphKeys.LOSSES, mask_loss)
+        mask_losses.append(mask_loss)
 
   rpn_box_losses = tf.add_n(rpn_box_losses)
   rpn_cls_losses = tf.add_n(rpn_cls_losses)
