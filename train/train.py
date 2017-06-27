@@ -280,46 +280,7 @@ def train():
                       tot_loss, rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss,
                       gt_boxesnp.shape[0], 
                       rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch))
-            # if np.asanyarray(tmp_3np).shape[0]>=1:
-            #     print(np.asanyarray(tmp_2np).shape)
-            #     draw_img(step, np.asanyarray(tmp_0np)[0][0], name='full')
-            #     draw_img(step, np.asanyarray(tmp_2np)[0][0], name='crop')
-            #     print ("pyramid")
-            #     print (np.asanyarray(tmp_0np).shape)
-            #     print (np.asanyarray(tmp_0np)[0][0])
-            #     print ("splitted_rois")
-            #     print (np.asanyarray(tmp_1np).shape)
-            #     print (np.asanyarray(tmp_1np))
-            #     print ("cropped")
-            #     print (np.asanyarray(tmp_2np).shape)
-            #     print (np.asanyarray(tmp_2np)[0][0])
-            #     print ("boxes_in_crop", np.asanyarray(tmp_3np))
-            #     print ("ih iw: ", np.asanyarray(tmp_4np))
 
-
-            #print ("iw", np.asanyarray(tmp_4np))
-            #if np.asarray(tmp_3np[3]).shape[0]>=1:
-                #print ("ordered_rois")
-                #print (np.asarray(tmp_0np)[0])
-                #print ("pyramid_feature")
-                #print ("p5",np.asarray(tmp_1np[0]).shape)
-                #print (np.asarray(tmp_1np[0][0][0]))
-
-                #print ("real_pyramid")
-                #print (np.asarray(tmp_4np).shape)
-                #print (np.asarray(tmp_4np)[0][0])
-                #print ("p4",np.asanyarray(tmp_1np[1]).shape)
-                #print ("p3",np.asanyarray(tmp_1np[2]).shape)
-                #print ("p2",np.asanyarray(tmp_1np[3]).shape)
-
-                #print ("cropped_rois")
-                #print (np.asarray(tmp_2np).shape)
-                #print (np.asarray(tmp_2np)[0][0])
-                # print ("assigned_layer_num")
-                # print ("p5:",np.asarray(tmp_3np[3]).shape[0])
-                # print ("p4:",np.asarray(tmp_3np[2]).shape[0])
-                # print ("p3:",np.asarray(tmp_3np[1]).shape[0])
-                # print ("p2:",np.asarray(tmp_3np[0]).shape[0])
             # draw_bbox(step, 
             #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
             #           name='est', 
