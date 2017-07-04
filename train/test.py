@@ -72,56 +72,6 @@ def restore(sess):
             checkpoint_path = tf.train.latest_checkpoint(FLAGS.train_dir)
             ###########
             restorer = tf.train.Saver()
-            ###########
-
-            ###########
-            # not_restore = [ 'pyramid/fully_connected/weights:0', 
-            #                 'pyramid/fully_connected/biases:0',
-            #                 'pyramid/fully_connected/weights:0', 
-            #                 'pyramid/fully_connected_1/biases:0',
-            #                 'pyramid/fully_connected_1/weights:0', 
-            #                 'pyramid/fully_connected_2/weights:0', 
-            #                 'pyramid/fully_connected_2/biases:0',
-            #                 'pyramid/fully_connected_3/weights:0', 
-            #                 'pyramid/fully_connected_3/biases:0',
-            #                 'pyramid/Conv/weights:0', 
-            #                 'pyramid/Conv/biases:0',
-            #                 'pyramid/Conv_1/weights:0', 
-            #                 'pyramid/Conv_1/biases:0', 
-            #                 'pyramid/Conv_2/weights:0', 
-            #                 'pyramid/Conv_2/biases:0', 
-            #                 'pyramid/Conv_3/weights:0', 
-            #                 'pyramid/Conv_3/biases:0',
-            #                 'pyramid/Conv2d_transpose/weights:0', 
-            #                 'pyramid/Conv2d_transpose/biases:0', 
-            #                 'pyramid/Conv_4/weights:0',
-            #                 'pyramid/Conv_4/biases:0',
-            #                 'pyramid/fully_connected/weights/Momentum:0', 
-            #                 'pyramid/fully_connected/biases/Momentum:0',
-            #                 'pyramid/fully_connected/weights/Momentum:0', 
-            #                 'pyramid/fully_connected_1/biases/Momentum:0',
-            #                 'pyramid/fully_connected_1/weights/Momentum:0', 
-            #                 'pyramid/fully_connected_2/weights/Momentum:0', 
-            #                 'pyramid/fully_connected_2/biases/Momentum:0',
-            #                 'pyramid/fully_connected_3/weights/Momentum:0', 
-            #                 'pyramid/fully_connected_3/biases/Momentum:0',
-            #                 'pyramid/Conv/weights/Momentum:0', 
-            #                 'pyramid/Conv/biases/Momentum:0',
-            #                 'pyramid/Conv_1/weights/Momentum:0', 
-            #                 'pyramid/Conv_1/biases/Momentum:0', 
-            #                 'pyramid/Conv_2/weights/Momentum:0', 
-            #                 'pyramid/Conv_2/biases/Momentum:0', 
-            #                 'pyramid/Conv_3/weights/Momentum:0', 
-            #                 'pyramid/Conv_3/biases/Momentum:0',
-            #                 'pyramid/Conv2d_transpose/weights/Momentum:0', 
-            #                 'pyramid/Conv2d_transpose/biases/Momentum:0', 
-            #                 'pyramid/Conv_4/weights/Momentum:0',
-            #                 'pyramid/Conv_4/biases/Momentum:0',]
-            # vars_to_restore = [v for v in  tf.all_variables()if v.name not in not_restore]
-            # restorer = tf.train.Saver(vars_to_restore)
-            # for var in vars_to_restore:
-            #     print ('restoring ', var.name)
-            ############
 
             restorer.restore(sess, checkpoint_path)
             print ('restored previous model %s from %s'\
@@ -158,7 +108,7 @@ def restore(sess):
            print ('Checking your params %s' %(checkpoint_path))
            raise
     
-def train():
+def test():
     """The main function that runs training"""
 
     ## data
@@ -167,17 +117,17 @@ def train():
                              FLAGS.dataset_split_name, 
                              FLAGS.dataset_dir, 
                              FLAGS.im_batch,
-                             is_training=True)
+                             is_training=False)
 
-    data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16,
-            dtypes=(
-                image.dtype, ih.dtype, iw.dtype, 
-                gt_boxes.dtype, gt_masks.dtype, 
-                num_instances.dtype, img_id.dtype)) 
-    enqueue_op = data_queue.enqueue((image, ih, iw, gt_boxes, gt_masks, num_instances, img_id))
-    data_queue_runner = tf.train.QueueRunner(data_queue, [enqueue_op] * 4)
-    tf.add_to_collection(tf.GraphKeys.QUEUE_RUNNERS, data_queue_runner)
-    (image, ih, iw, gt_boxes, gt_masks, num_instances, img_id) =  data_queue.dequeue()
+    # data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16,
+    #         dtypes=(
+    #             image.dtype, ih.dtype, iw.dtype, 
+    #             gt_boxes.dtype, gt_masks.dtype, 
+    #             num_instances.dtype, img_id.dtype)) 
+    # enqueue_op = data_queue.enqueue((image, ih, iw, gt_boxes, gt_masks, num_instances, img_id))
+    # data_queue_runner = tf.train.QueueRunner(data_queue, [enqueue_op] * 4)
+    # tf.add_to_collection(tf.GraphKeys.QUEUE_RUNNERS, data_queue_runner)
+    # (image, ih, iw, gt_boxes, gt_masks, num_instances, img_id) =  data_queue.dequeue()
     im_shape = tf.shape(image)
     image = tf.reshape(image, (im_shape[0], im_shape[1], im_shape[2], 3))
 
@@ -187,49 +137,34 @@ def train():
     outputs = pyramid_network.build(end_points, im_shape[1], im_shape[2], pyramid_map,
             num_classes=81,
             base_anchors=9,
-            is_training=True,
+            is_training=False,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
             loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
 
-
-    total_loss = outputs['total_loss']
-    losses  = outputs['losses']
-    batch_info = outputs['batch_info']
-    regular_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-    
     input_image = end_points['input']
     final_box = outputs['final_boxes']['box']
     final_cls = outputs['final_boxes']['cls']
     final_prob = outputs['final_boxes']['prob']
-    final_gt_cls = outputs['final_boxes']['gt_cls']
     final_rpn_box = outputs['final_boxes']['rpn_box']
-    final_max_overlaps = outputs['final_boxes']['max_overlaps']
     final_mask = outputs['mask']['mask']
-    gt = outputs['gt']
 
     #############################
-    tmp_0 = outputs['losses']
-    tmp_1 = outputs['losses']
-    tmp_2 = outputs['losses']
-    tmp_3 = outputs['losses']
-    tmp_4 = outputs['losses']
-
-    # tmp_0 = outputs['tmp_0']
-    #tmp_1 = outputs['tmp_1']
-    #tmp_2 = outputs['tmp_2']
-    tmp_3 = outputs['tmp_3']
-    tmp_4 = outputs['tmp_4']
+    tmp_0 = outputs['mask']['mask']
+    tmp_1 = outputs['mask']['mask']
+    tmp_2 = outputs['mask']['mask']
+    tmp_3 = outputs['mask']['mask']
+    tmp_4 = outputs['mask']['mask']
     ############################
 
 
     ## solvers
     global_step = slim.create_global_step()
-    update_op = solve(global_step)
+    #update_op = solve(global_step)
 
     cropped_rois = tf.get_collection('__CROPPED__')[0]
     transposed = tf.get_collection('__TRANSPOSED__')[0]
     
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     init_op = tf.group(
             tf.global_variables_initializer(),
@@ -261,27 +196,25 @@ def train():
         
         start_time = time.time()
 
-        s_, tot_loss, reg_lossnp, img_id_str, \
-        rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss, \
+        img_id_str, \
         gt_boxesnp, \
-        rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch, \
-        input_imagenp, final_boxnp, final_clsnp, final_probnp, final_gt_clsnp, final_rpn_boxnp, final_max_overlapsnp, final_masknp, gtnp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np= \
-                     sess.run([update_op, total_loss, regular_loss, img_id] + 
-                              losses + 
+        input_imagenp, final_boxnp, final_clsnp, final_probnp, final_rpn_boxnp, final_masknp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np= \
+                     sess.run([img_id] + 
                               [gt_boxes] + 
-                              batch_info + 
-                              [input_image] + [final_box] + [final_cls] + [final_prob] + [final_gt_cls] + [final_rpn_box] + [final_max_overlaps] + [final_mask] + [gt] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4])
+                              [input_image] + [final_box] + [final_cls] + [final_prob] + [final_rpn_box] + [final_mask] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4])
 
         duration_time = time.time() - start_time
         if step % 1 == 0: 
-            print ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
-                    """total-loss %.4f(%.4f, %.4f, %.6f, %.4f, %.4f), """
+            print ( """iter %d: image-id:%07d, time:%.3f(sec), """
                     """instances: %d, """
-                    """batch:(%d|%d, %d|%d, %d|%d)""" 
-                   % (step, img_id_str, duration_time, reg_lossnp, 
-                      tot_loss, rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss,
-                      gt_boxesnp.shape[0], 
-                      rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch))
+                    
+                   % (step, img_id_str, duration_time, 
+                      gt_boxesnp.shape[0]))
+
+            # print("tmp")
+            # print(np.asarray(tmp_0np).shape)
+            # print(np.asarray(tmp_1np).shape)
+            # print(np.asarray(tmp_2np).shape)
 
             # print ("labels")    
             # print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
@@ -311,44 +244,28 @@ def train():
                 # print ("p4:",np.asarray(tmp_3np[2]).shape[0])
                 # print ("p3:",np.asarray(tmp_3np[1]).shape[0])
                 # print ("p2:",np.asarray(tmp_3np[0]).shape[0])
-        if step % 10 == 0: 
+        if step % 1 == 0: 
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-                      name='train_est', 
-                      bbox=final_rpn_boxnp, 
+                      name='test_est', 
+                      bbox=final_boxnp, 
                       label=final_clsnp, 
                       prob=final_probnp,
-                      mask=final_masknp,
-                      gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
-                      iou=final_max_overlapsnp,
-                      vis_all=True
-                      )
+                      mask=final_masknp,)
 
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-                      name='train_roi', 
-                      bbox=final_rpn_boxnp, 
+                      name='test_roi', 
+                      bbox=final_boxnp, 
                       label=final_clsnp, 
                       prob=final_probnp,
-                      gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
-                      iou=final_max_overlapsnp
                       )
-
-            draw_bbox(step, 
-                      np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-                      name='train_gt', 
-                      bbox=gtnp[:,0:4], 
-                      label=np.asarray(gtnp[:,4], dtype=np.uint8),
-                      )
+            # print ("boxes")
+            # print (np.asarray(final_boxnp).shape)
+            # print ("classes")
+            # print (cat_id_to_cls_name(np.unique(np.asarray(final_clsnp))))
+            #print (cat_id_to_cls_name(np.unique(np.argmax(np.array(final_clsnp),axis=1))))
             
-            print ("labels")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
-            print ("classes")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
-            
-            if np.isnan(tot_loss) or np.isinf(tot_loss):
-                print (gt_boxesnp)
-                raise
           
         if step % 100 == 0:
             summary_str = sess.run(summary_op)
@@ -366,4 +283,4 @@ def train():
 
 
 if __name__ == '__main__':
-    train()
+    test()

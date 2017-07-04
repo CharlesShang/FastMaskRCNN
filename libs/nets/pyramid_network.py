@@ -19,6 +19,8 @@ from libs.layers import ROIAlign_
 from libs.layers import sample_rpn_outputs
 from libs.layers import sample_rpn_outputs_with_gt
 from libs.layers import assign_boxes
+from libs.layers import assign_boxes_
+from libs.layers import inst_inference
 from libs.visualization.summary_utils import visualize_bb, visualize_final_predictions, visualize_input
 
 _TRAIN_MASK = True
@@ -248,14 +250,13 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         
         rpn_probs = tf.nn.softmax(tf.reshape(rpn_clses, [-1, 2]))
         rois, roi_clses, scores, = anchor_decoder(rpn_boxes, rpn_probs, rpn_anchors, ih, iw)
-        # rois, scores, batch_inds = sample_rpn_outputs(rois, rpn_probs[:, 1])
-        rois, scores, batch_inds, mask_rois, mask_scores, mask_batch_inds = \
+        if is_training is True:
+          rois, scores, batch_inds, mask_rois, mask_scores, mask_batch_inds = \
                 sample_rpn_outputs_with_gt(rois, rpn_probs[:, 1], gt_boxes, is_training=is_training)
-
-        # if is_training:
-        #     # rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes)
-        #     rois, scores, batch_inds = _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.2)
+        else:
+          rois, scores, batch_inds = sample_rpn_outputs(rois, rpn_probs[:, 1])
         
+
         outputs['roi'] = {'box': rois, 'score': scores}
 
         ## cropping regions
@@ -269,26 +270,18 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         ordered_rois = []
         pyramid_feature = []
         for i in range(5, 1, -1):
-            print(i)
             p = 'P%d'%i
             splitted_rois = assigned_rois[i-2]
             batch_inds = assigned_batch_inds[i-2]
             cropped, boxes_in_crop = ROIAlign_(pyramid[p], splitted_rois, batch_inds, ih, iw, stride=2**i,
                                pooled_height=14, pooled_width=14)
-            # cropped = ROIAlign(pyramid[p], splitted_rois, batch_inds, stride=2**i,
-            #                    pooled_height=14, pooled_width=14)
             cropped_rois.append(cropped)
             ordered_rois.append(splitted_rois)
             pyramid_feature.append(tf.transpose(pyramid[p],[0,3,1,2]))
-            # if i is 5:
-            #     outputs['tmp_0'] = tf.transpose(pyramid[p],[0,3,1,2])
-            #     outputs['tmp_1'] = splitted_rois
-            #     outputs['tmp_2'] = tf.transpose(cropped,[0,3,1,2])
-            #     outputs['tmp_3'] = boxes_in_crop
-            #     outputs['tmp_4'] = [ih, iw]
             
         cropped_rois = tf.concat(values=cropped_rois, axis=0)
         ordered_rois = tf.concat(values=ordered_rois, axis=0)
+        #pyramid_feature = tf.concat(values=pyramid_feature, axis=0)
 
 
         outputs['ordered_rois'] = ordered_rois
@@ -317,30 +310,40 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         final_boxes, classes, scores = \
                 roi_decoder(box, cls2_prob, ordered_rois, ih, iw)
 
-        #outputs['tmp_0'] = ordered_rois
-        #outputs['tmp_1'] = assigned_rois
-        #outputs['tmp_2'] = box
-        #outputs['tmp_3'] = final_boxes
-        #outputs['tmp_4'] = cls2_prob
+        
 
-        #outputs['final_boxes'] = {'box': final_boxes, 'cls': classes}
-        outputs['final_boxes'] = {'box': final_boxes, 'cls': classes, 'prob': cls2_prob}
         ## for testing, maskrcnn takes refined boxes as inputs
         if not is_training:
-          rois = final_boxes
-          # [assigned_rois, assigned_batch_inds, assigned_layer_inds] = \
-          #       assign_boxes(rois, [rois, batch_inds], [2, 3, 4, 5])
+          
+          inst_boxes, inst_classes, inst_prob, batch_inds = inst_inference(final_boxes, classes, cls2_prob)
+          [assigned_rois, assigned_classes, assigned_prob, assigned_batch_inds, assigned_layer_inds] = assign_boxes(inst_boxes, [inst_boxes, inst_classes, inst_prob, batch_inds], [2, 3, 4, 5])
+
+          cropped_rois = []
+          ordered_inst_boxes = []
+          ordered_inst_classes = []
+          ordered_inst_prob = []
           for i in range(5, 1, -1):
             p = 'P%d'%i
             splitted_rois = assigned_rois[i-2]
+            splitted_classes = assigned_classes[i-2]
+            splitted_prob = assigned_prob[i-2]
             batch_inds = assigned_batch_inds[i-2]
-            cropped = ROIAlign(pyramid[p], splitted_rois, batch_inds, stride=2**i,
+            cropped, boxes_in_crop = ROIAlign_(pyramid[p], splitted_rois, batch_inds, ih, iw, stride=2**i,
                                pooled_height=14, pooled_width=14)
             cropped_rois.append(cropped)
-            ordered_rois.append(splitted_rois)
+            ordered_inst_boxes.append(splitted_rois)
+            ordered_inst_classes.append(splitted_classes)
+            ordered_inst_prob.append(splitted_prob)
+
+
           cropped_rois = tf.concat(values=cropped_rois, axis=0)
-          ordered_rois = tf.concat(values=ordered_rois, axis=0)
-          
+          ordered_inst_boxes = tf.concat(values=ordered_inst_boxes, axis=0)
+          ordered_inst_classes = tf.concat(values=ordered_inst_classes, axis=0)
+          ordered_inst_prob = tf.concat(values=ordered_inst_prob, axis=0)
+          outputs['final_boxes'] = {'box': ordered_inst_boxes, 'cls': ordered_inst_classes, 'prob': ordered_inst_prob, 'rpn_box': ordered_rois}
+        else:
+          outputs['final_boxes'] = {'box': final_boxes, 'cls': classes, 'prob': cls2_prob, 'rpn_box': ordered_rois}
+
         ## mask head
         m = cropped_rois
         for _ in range(4):
@@ -460,10 +463,11 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         boxes = outputs['refined']['box']
         classes = outputs['refined']['cls']
 
-        labels, bbox_targets, bbox_inside_weights = \
+        labels, bbox_targets, bbox_inside_weights, max_overlaps = \
           roi_encoder(gt_boxes, ordered_rois, num_classes, scope='ROIEncoder')
 
         outputs['final_boxes']['gt_cls'] = slim.one_hot_encoding(labels, num_classes, on_value=1.0, off_value=0.0)
+        outputs['final_boxes']['max_overlaps'] = max_overlaps
         outputs['gt'] = gt_boxes
         labels, classes, boxes, bbox_targets, bbox_inside_weights = \
                 _filter_negative_samples(tf.reshape(labels, [-1]),[

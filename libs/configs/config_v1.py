@@ -274,9 +274,17 @@ tf.app.flags.DEFINE_integer(
     'post_nms_top_n', 2000,
     'Number of rpn anchors that should be sampled after nms')
 
+tf.app.flags.DEFINE_integer(
+    'post_nms_inst_n', 200,
+    "Number of inst after NMS")
+
 tf.app.flags.DEFINE_float(
     'rpn_nms_threshold', 0.7,
-    'NMS threshold')
+    'NMS threshold in RPN')
+
+tf.app.flags.DEFINE_float(
+    'inst_nms_threshold', 0.5,
+    'NMS threshold in inst inference')
 
 ##################################
 #            Mask                #

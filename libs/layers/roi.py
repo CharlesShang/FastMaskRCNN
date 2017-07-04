@@ -92,12 +92,14 @@ def encode(gt_boxes, rois, num_classes):
       bbox_targets = np.zeros((num_rois, 4 * num_classes), np.float32)
       bbox_inside_weights = np.zeros((num_rois, 4 * num_classes), np.float32)
       bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 64)
+
       if bg_rois < num_rois:
           bg_inds = np.arange(num_rois)
           ignore_inds = np.random.choice(bg_inds, size=num_rois - bg_rois, replace=False)
           labels[ignore_inds] = -1 
+      max_overlaps = labels
 
-  return labels, bbox_targets, bbox_inside_weights
+  return labels, bbox_targets, bbox_inside_weights, max_overlaps.astype(np.float32)
 
 def decode(boxes, scores, rois, ih, iw):
   """Decode prediction targets into boxes and only keep only one boxes of greatest possibility for each rois

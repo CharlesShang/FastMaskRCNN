@@ -12,6 +12,7 @@ from . import roi
 from . import mask
 from . import sample
 from . import assign
+from . import inst
 from libs.boxes.anchor import anchors_plane
 
 def anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEncoder'):
@@ -51,18 +52,20 @@ def anchor_decoder(boxes, scores, all_anchors, ih, iw, scope='AnchorDecoder'):
 def roi_encoder(gt_boxes, rois, num_classes, scope='ROIEncoder'):
   
   with tf.name_scope(scope) as sc:
-    labels, bbox_targets, bbox_inside_weights = \
+    labels, bbox_targets, bbox_inside_weights, max_overlaps = \
       tf.py_func(roi.encode,
                 [gt_boxes, rois, num_classes],
-                [tf.float32, tf.float32, tf.float32])
+                [tf.float32, tf.float32, tf.float32, tf.float32]
+                )
     labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='labels')
     bbox_targets = tf.convert_to_tensor(bbox_targets, name='bbox_targets')
     bbox_inside_weights = tf.convert_to_tensor(bbox_inside_weights, name='bbox_inside_weights')
     labels = tf.reshape(labels, (-1, ))
     bbox_targets = tf.reshape(bbox_targets, (-1, num_classes * 4))
     bbox_inside_weights = tf.reshape(bbox_inside_weights, (-1, num_classes * 4))
+    max_overlaps = tf.reshape(max_overlaps,(-1, ))
   
-  return labels, bbox_targets, bbox_inside_weights
+  return labels, bbox_targets, bbox_inside_weights, max_overlaps
 
 
 def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):
@@ -175,3 +178,65 @@ def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
             assigned_tensors.append(split_tensors)
 
         return assigned_tensors + [assigned_layers]
+
+def assign_boxes_(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
+
+    with tf.name_scope(scope) as sc:
+        min_k = layers[0]
+        max_k = layers[-1]
+        assigned_layers = \
+            tf.py_func(assign.assign_boxes, 
+                     [ gt_boxes, min_k, max_k ],
+                     tf.int32)
+        assigned_layers = tf.reshape(assigned_layers, [-1])
+
+        assigned_tensors = []
+        for t in tensors:
+            split_tensors = []
+            for l in layers:
+                tf.cast(l, tf.int32)
+                inds = tf.where(tf.equal(assigned_layers, l))
+                inds = tf.reshape(inds, [-1])
+                split_tensors.append(tf.gather(t, inds))
+            assigned_tensors.append(split_tensors)
+
+        return assigned_tensors + [assigned_layers]
+
+# def assign_boxes_(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
+
+#     with tf.name_scope(scope) as sc:
+#         min_k = layers[0]
+#         max_k = layers[-1]
+#         assigned_layers = \
+#             tf.py_func(assign.assign_boxes, 
+#                      [ gt_boxes, min_k, max_k ],
+#                      tf.int32)
+#         assigned_layers = tf.reshape(assigned_layers, [-1])
+
+#         assigned_tensors = []
+#         for t in tensors:
+#             split_tensors = []
+#             for l in layers:
+#                 tf.cast(l, tf.int32)
+#                 inds = tf.where(tf.equal(assigned_layers, l))
+#                 inds = tf.reshape(inds, [-1])
+#                 split_tensors.append(tf.gather(t, inds))
+#             assigned_tensors.append(split_tensors)
+
+#         ordered_cropped_rois = tf.concat([assigned_tensors[0][3],assigned_tensors[0][2],assigned_tensors[0][1],assigned_tensors[0][0]],0)
+
+#         return [ordered_cropped_rois] + assigned_tensors + [assigned_layers]
+
+def inst_inference(final_boxes, classes, cls2_prob, scope='instInference'):
+    with tf.name_scope(scope) as sc:
+        inst_boxes, inst_classes, inst_prob, batch_inds = \
+            tf.py_func(inst.inference,
+                       [final_boxes, classes, cls2_prob],
+                       [tf.float32, tf.int32, tf.float32, tf.int32])
+
+    inst_boxes = tf.convert_to_tensor(inst_boxes, name='instBoxes')
+    inst_classes = tf.convert_to_tensor(inst_classes, name='instClasses')
+    inst_prob = tf.convert_to_tensor(inst_prob, name='instProb')
+    batch_inds = tf.convert_to_tensor(batch_inds, name='BatchInds')
+
+    return [inst_boxes] + [inst_classes] + [inst_prob] + [batch_inds]
