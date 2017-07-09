@@ -90,6 +90,21 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
         gt_assignment = overlaps.argmax(axis=1) # B
         max_overlaps = overlaps[np.arange(boxes.shape[0]), gt_assignment] # B
         fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
+        if _DEBUG and np.argmax(overlaps[fg_inds],axis=1).size < gt_boxes.size/5.0:
+            print("gt_size")
+            print(gt_boxes)
+            gt_height = (gt_boxes[:,2]-gt_boxes[:,0])
+            gt_width = (gt_boxes[:,3]-gt_boxes[:,1])
+            gt_dim = np.vstack((gt_height, gt_width))
+            print(np.transpose(gt_dim))
+            #print(gt_height)
+            #print(gt_width)
+
+            print('SAMPLE: %d after overlaps by %s' % (len(fg_inds),cfg.FLAGS.fg_threshold))
+            print("detected object no.")
+            print(np.argmax(overlaps[fg_inds],axis=1))
+            print("total object")
+            print(gt_boxes.size/5.0)
 
         mask_fg_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
         if mask_fg_inds.size > cfg.FLAGS.masks_per_image:
@@ -105,14 +120,15 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
       	
 	# TODO: sampling strategy
       	bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 64)
+      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8)#64
       	if bg_inds.size > 0 and bg_rois < bg_inds.size:
            bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
-	keep_inds = np.append(fg_inds, bg_inds)
+        keep_inds = np.append(fg_inds, bg_inds)
+        #print(gt_boxes[np.argmax(overlaps[fg_inds],axis=1),4])
     else:
         bg_inds = np.arange(boxes.shape[0])
-        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 64)
+        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 8)#64
         if bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
