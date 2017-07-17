@@ -294,47 +294,7 @@ def train():
                       gt_boxesnp.shape[0], 
                       rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch))
 
-            # print ("labels")    
-            # print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
-            # print ("classes")
-            # print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
-            # print ("mask rois before filter")
-            # print (np.array(tmp_0np))
-            # print (np.array(tmp_1np))
-            # print (np.array(tmp_2np))
-            # print (np.array(tmp_3np))
-            # print ("mask rois after filter")
-            # print (np.array(tmp_0np).shape)
-            # print (np.array(tmp_2np).shape)
-            # print (np.array(tmp_1np).shape)
-            # print ("mask rois after filter")
-            # print ((final_masknp).shape)
-            # print (np.max(final_masknp))
-            # print (np.min(final_masknp))
 
-            #print ("iw", np.asanyarray(tmp_4np))
-            #if np.asarray(tmp_3np[3]).shape[0]>=1:
-                #print ("ordered_rois")
-                #print (np.asarray(tmp_0np)[0])
-                #print ("pyramid_feature")
-                #print ("p5",np.asarray(tmp_1np[0]).shape)
-                #print (np.asarray(tmp_1np[0][0][0]))
-
-                #print ("real_pyramid")
-                #print (np.asarray(tmp_4np).shape)
-                #print (np.asarray(tmp_4np)[0][0])
-                #print ("p4",np.asanyarray(tmp_1np[1]).shape)
-                #print ("p3",np.asanyarray(tmp_1np[2]).shape)
-                #print ("p2",np.asanyarray(tmp_1np[3]).shape)
-
-                #print ("cropped_rois")
-                #print (np.asarray(tmp_2np).shape)
-                #print (np.asarray(tmp_2np)[0][0])
-                # print ("assigned_layer_num")
-                # print ("p5:",np.asarray(tmp_3np[3]).shape[0])
-                # print ("p4:",np.asarray(tmp_3np[2]).shape[0])
-                # print ("p3:",np.asarray(tmp_3np[1]).shape[0])
-                # print ("p2:",np.asarray(tmp_3np[0]).shape[0])
         if step % 50 == 0: 
             # draw_bbox(step, 
             #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
@@ -356,33 +316,6 @@ def train():
                   	  prob=np.zeros((tmp_2np.shape[0],81), dtype=np.float32)+1.0,
                       mask=tmp_2np,
                       vis_all=True)
-
-            # draw_bbox(step, 
-            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-            #           name='train_roi', 
-            #           bbox=final_rpn_boxnp, 
-            #           label=final_clsnp, 
-            #           prob=final_probnp,
-            #           gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
-            #           iou=final_max_overlapsnp
-            #           )
-
-            # draw_bbox(step, 
-            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-            #           name='train_msk', 
-            #           bbox=tmp_0np, 
-            #           label=tmp_2np, 
-            #           prob=np.zeros((tmp_2np.shape[0],81), dtype=np.float32)+1.0,
-            #           mask=tmp_1np,
-            #           vis_all=True
-            #           )
-
-            # draw_bbox(step, 
-            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-            #           name='train_gt', 
-            #           bbox=gtnp[:,0:4], 
-            #           label=np.asarray(gtnp[:,4], dtype=np.uint8),
-            #           )
 
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 

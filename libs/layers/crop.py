@@ -60,7 +60,6 @@ def crop_(images, boxes, batch_inds, ih, iw, stride = 1, pooled_height = 7, pool
   with tf.name_scope(scope):
     #
     boxes_bf = boxes
-    # boxes = boxes / (stride + 0.0)
     boxes = tf.reshape(boxes, [-1, 4])
 
     # normalize the boxes and swap x y dimensions
@@ -69,8 +68,8 @@ def crop_(images, boxes, batch_inds, ih, iw, stride = 1, pooled_height = 7, pool
 
     xs = boxes[:, 0] 
     ys = boxes[:, 1]
-    xs = xs / tf.cast(iw, tf.float32)#tf.cast(shape[2], tf.float32)
-    ys = ys / tf.cast(ih, tf.float32)#tf.cast(shape[1], tf.float32)
+    xs = xs / tf.cast(iw, tf.float32)
+    ys = ys / tf.cast(ih, tf.float32)
     boxes = tf.concat([ys[:, tf.newaxis], xs[:, tf.newaxis]], axis=1)
     boxes = tf.reshape(boxes, [-1, 4])  # to (y1, x1, y2, x2)
     
