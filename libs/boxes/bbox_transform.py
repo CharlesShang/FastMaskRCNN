@@ -31,10 +31,16 @@ def bbox_transform(ex_rois, gt_rois):
 
     # warnings.catch_warnings()
     # warnings.filterwarnings('error')
-    targets_dx = 10.0 * (gt_ctr_x - ex_ctr_x) / ex_widths
-    targets_dy = 10.0 * (gt_ctr_y - ex_ctr_y) / ex_heights
-    targets_dw = 5.0 * np.log(gt_widths / ex_widths)
-    targets_dh = 5.0 * np.log(gt_heights / ex_heights)
+
+    # targets_dx = 10.0 * (gt_ctr_x - ex_ctr_x) / ex_widths
+    # targets_dy = 10.0 * (gt_ctr_y - ex_ctr_y) / ex_heights
+    # targets_dw = 5.0 * np.log(gt_widths / ex_widths)
+    # targets_dh = 5.0 * np.log(gt_heights / ex_heights)
+
+    targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths
+    targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights
+    targets_dw = np.log(gt_widths / ex_widths)
+    targets_dh = np.log(gt_heights / ex_heights)
 
     targets = np.vstack(
         (targets_dx, targets_dy, targets_dw, targets_dh)).transpose()
@@ -51,10 +57,15 @@ def bbox_transform_inv(boxes, deltas):
     ctr_x = boxes[:, 0] + 0.5 * widths
     ctr_y = boxes[:, 1] + 0.5 * heights
 
-    dx = deltas[:, 0::4] * 0.1
-    dy = deltas[:, 1::4] * 0.1
-    dw = deltas[:, 2::4] * 0.2
-    dh = deltas[:, 3::4] * 0.2
+    # dx = deltas[:, 0::4] * 0.1
+    # dy = deltas[:, 1::4] * 0.1
+    # dw = deltas[:, 2::4] * 0.2
+    # dh = deltas[:, 3::4] * 0.2
+
+    dx = deltas[:, 0::4] 
+    dy = deltas[:, 1::4] 
+    dw = deltas[:, 2::4] 
+    dh = deltas[:, 3::4] 
 
     pred_ctr_x = dx * widths[:, np.newaxis] + ctr_x[:, np.newaxis]
     pred_ctr_y = dy * heights[:, np.newaxis] + ctr_y[:, np.newaxis]

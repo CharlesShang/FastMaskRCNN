@@ -10,6 +10,7 @@ import time
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+import logging
 from time import gmtime, strftime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -157,6 +158,15 @@ def restore(sess):
         except:
            print ('Checking your params %s' %(checkpoint_path))
            raise
+
+def log():
+	logger = logging.getLogger(__name__)
+	logger.setLevel(logging.INFO)
+	handler = logging.FileHandler('log.log')
+	handler.setLevel(logging.INFO)
+	logger.addHandler(handler)
+	return logger
+
     
 def train():
     """The main function that runs training"""
@@ -168,7 +178,7 @@ def train():
                              FLAGS.dataset_dir, 
                              FLAGS.im_batch,
                              is_training=True)
-
+    logger = log()
     data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16,
             dtypes=(
                 image.dtype, ih.dtype, iw.dtype, 
@@ -189,7 +199,8 @@ def train():
             base_anchors=9,
             is_training=True,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
-            loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
+            loss_weights=[1.0, 1.0, 1.0, 1.0, 1.0])
+            #loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
 
 
     total_loss = outputs['total_loss']
@@ -204,7 +215,7 @@ def train():
     final_gt_cls = outputs['final_boxes']['gt_cls']
     final_rpn_box = outputs['final_boxes']['rpn_box']
     final_max_overlaps = outputs['final_boxes']['max_overlaps']
-    final_mask = outputs['mask']['mask']
+    final_mask = outputs['mask']['mask']#outputs['mask']['final_mask']
     gt = outputs['gt']
 
     #############################
@@ -214,9 +225,9 @@ def train():
     tmp_3 = outputs['losses']
     tmp_4 = outputs['losses']
 
-    # tmp_0 = outputs['tmp_0']
-    #tmp_1 = outputs['tmp_1']
-    #tmp_2 = outputs['tmp_2']
+    tmp_0 = outputs['tmp_0']
+    tmp_1 = outputs['tmp_1']
+    tmp_2 = outputs['tmp_2']
     tmp_3 = outputs['tmp_3']
     tmp_4 = outputs['tmp_4']
     ############################
@@ -229,7 +240,7 @@ def train():
     cropped_rois = tf.get_collection('__CROPPED__')[0]
     transposed = tf.get_collection('__TRANSPOSED__')[0]
     
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.9)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     init_op = tf.group(
             tf.global_variables_initializer(),
@@ -274,7 +285,7 @@ def train():
 
         duration_time = time.time() - start_time
         if step % 1 == 0: 
-            print ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
+            logger.info ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
                     """total-loss %.4f(%.4f, %.4f, %.6f, %.4f, %.4f), """
                     """instances: %d, """
                     """batch:(%d|%d, %d|%d, %d|%d)""" 
@@ -287,6 +298,19 @@ def train():
             # print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
             # print ("classes")
             # print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
+            # print ("mask rois before filter")
+            # print (np.array(tmp_0np))
+            # print (np.array(tmp_1np))
+            # print (np.array(tmp_2np))
+            # print (np.array(tmp_3np))
+            # print ("mask rois after filter")
+            # print (np.array(tmp_0np).shape)
+            # print (np.array(tmp_2np).shape)
+            # print (np.array(tmp_1np).shape)
+            # print ("mask rois after filter")
+            # print ((final_masknp).shape)
+            # print (np.max(final_masknp))
+            # print (np.min(final_masknp))
 
             #print ("iw", np.asanyarray(tmp_4np))
             #if np.asarray(tmp_3np[3]).shape[0]>=1:
@@ -311,40 +335,68 @@ def train():
                 # print ("p4:",np.asarray(tmp_3np[2]).shape[0])
                 # print ("p3:",np.asarray(tmp_3np[1]).shape[0])
                 # print ("p2:",np.asarray(tmp_3np[0]).shape[0])
-        if step % 10 == 0: 
-            draw_bbox(step, 
-                      np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-                      name='train_est', 
-                      bbox=final_rpn_boxnp, 
-                      label=final_clsnp, 
-                      prob=final_probnp,
-                      mask=final_masknp,
-                      gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
-                      iou=final_max_overlapsnp,
-                      vis_all=True
-                      )
+        if step % 50 == 0: 
+            # draw_bbox(step, 
+            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
+            #           name='train_est', 
+            #           bbox=final_rpn_boxnp, 
+            #           label=final_clsnp, 
+            #           prob=final_probnp,
+            #           mask=final_masknp,
+            #           gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
+            #           iou=final_max_overlapsnp,
+            #           vis_all=True
+            #           )
 
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-                      name='train_roi', 
-                      bbox=final_rpn_boxnp, 
-                      label=final_clsnp, 
-                      prob=final_probnp,
-                      gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
-                      iou=final_max_overlapsnp
-                      )
+                      name='train_est', 
+                      bbox=tmp_0np, 
+                      label=tmp_1np, 
+                  	  prob=np.zeros((tmp_2np.shape[0],81), dtype=np.float32)+1.0,
+                      mask=tmp_2np,
+                      vis_all=True)
+
+            # draw_bbox(step, 
+            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
+            #           name='train_roi', 
+            #           bbox=final_rpn_boxnp, 
+            #           label=final_clsnp, 
+            #           prob=final_probnp,
+            #           gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
+            #           iou=final_max_overlapsnp
+            #           )
+
+            # draw_bbox(step, 
+            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
+            #           name='train_msk', 
+            #           bbox=tmp_0np, 
+            #           label=tmp_2np, 
+            #           prob=np.zeros((tmp_2np.shape[0],81), dtype=np.float32)+1.0,
+            #           mask=tmp_1np,
+            #           vis_all=True
+            #           )
+
+            # draw_bbox(step, 
+            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
+            #           name='train_gt', 
+            #           bbox=gtnp[:,0:4], 
+            #           label=np.asarray(gtnp[:,4], dtype=np.uint8),
+            #           )
 
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
                       name='train_gt', 
-                      bbox=gtnp[:,0:4], 
-                      label=np.asarray(gtnp[:,4], dtype=np.uint8),
-                      )
+                      bbox=tmp_0np, 
+                      label=tmp_1np, 
+                  	  prob=np.zeros((tmp_2np.shape[0],81), dtype=np.float32)+1.0,
+                      mask=tmp_3np,
+                      vis_all=True)
             
-            print ("labels")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
-            print ("classes")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
+            # logger.info ("labels")
+            # logger.info (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
+            # logger.info ("classes")
+            # logger.info (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
             
             if np.isnan(tot_loss) or np.isinf(tot_loss):
                 print (gt_boxesnp)

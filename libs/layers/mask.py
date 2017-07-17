@@ -8,9 +8,18 @@ import cv2
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.logs.log import LOG
+import logging
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 
 _DEBUG = False 
+def log(file_name='log'):
+  logger = logging.getLogger(__name__)
+  logger.setLevel(logging.INFO)
+  handler = logging.FileHandler(file_name+'.log')
+  handler.setLevel(logging.INFO)
+  logger.addHandler(handler)
+  return logger
+
 def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   """Encode masks groundtruth into learnable targets
   Sample some exmaples
@@ -58,10 +67,9 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       # labels = labels[inds].astype(np.int32)
       # gt_assignment = gt_assignment[inds]
 
-      # ignore rois with overlaps between fg_threshold and bg_threshold 
       # mask are only defined on positive rois
-      ignore_inds = np.where((max_overlaps < cfg.FLAGS.fg_threshold))[0]
-      labels[ignore_inds] = -1 
+      # ignore_inds = np.where((max_overlaps < cfg.FLAGS.mask_threshold))[0]
+      # labels[ignore_inds] = -1 
 
       mask_targets = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.int32)
       mask_inside_weights = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.float32)
@@ -71,7 +79,7 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       for i in keep_inds:
         roi = rois[i, :4]
         cropped = gt_masks[gt_assignment[i], int(roi[1]):int(roi[3])+1, int(roi[0]):int(roi[2])+1]
-        cropped = cv2.resize(cropped, (mask_width, mask_height), interpolation=cv2.INTER_NEAREST)
+        cropped = cv2.resize(cropped, (mask_width, mask_height))#INTER_NEAREST
         
         mask_targets[i, :, :, int(labels[i])] = cropped
         mask_inside_weights[i, :, :, int(labels[i])] = 1
@@ -82,6 +90,88 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       mask_targets = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.int32)
       mask_inside_weights = np.zeros((total_masks, mask_height, mask_height, num_classes), dtype=np.float32)
   return labels, mask_targets, mask_inside_weights
+
+def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
+  """Encode masks groundtruth into learnable targets
+  Sample some exmaples
+  
+  Params
+  ------
+  gt_masks: image_height x image_width {0, 1} matrix, of shape (G, imh, imw)
+  gt_boxes: ground-truth boxes of shape (G, 5), each raw is [x1, y1, x2, y2, class]
+  rois:     the bounding boxes of shape (N, 4),
+  ## scores:   scores of shape (N, 1)
+  num_classes; K
+  mask_height, mask_width: height and width of output masks
+  
+  Returns
+  -------
+  # rois: boxes sampled for cropping masks, of shape (M, 4)
+  labels: class-ids of shape (M, 1)
+  mask_targets: learning targets of shape (M, pooled_height, pooled_width, K) in {0, 1} values
+  mask_inside_weights: of shape (M, pooled_height, pooled_width, K) in {0, 1}Í indicating which mask is sampled
+  """
+  total_masks = rois.shape[0]
+  if gt_boxes.size > 0: 
+      # B x G
+      overlaps = cython_bbox.bbox_overlaps(
+          np.ascontiguousarray(rois[:, 0:4], dtype=np.float),
+          np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
+      gt_assignment = overlaps.argmax(axis=1)  # shape is N
+      max_overlaps = overlaps[np.arange(len(gt_assignment)), gt_assignment] # N
+      # note: this will assign every rois with a positive label 
+      # labels = gt_boxes[gt_assignment, 4] # N
+      labels = np.zeros((total_masks, ), np.int32)
+      labels[:] = -1
+
+      # sample positive rois which intersection is more than 0.5
+      keep_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
+      num_masks = int(min(keep_inds.size, cfg.FLAGS.masks_per_image))
+      if keep_inds.size > 0 and num_masks < keep_inds.size:
+        keep_inds = np.random.choice(keep_inds, size=num_masks, replace=False)
+        LOG('Masks: %d of %d rois are considered positive mask. Number of masks %d'\
+                     %(num_masks, rois.shape[0], gt_masks.shape[0]))
+
+      labels[keep_inds] = gt_boxes[gt_assignment[keep_inds], -1]
+        
+      # rois = rois[inds]
+      # labels = labels[inds].astype(np.int32)
+      # gt_assignment = gt_assignment[inds]
+
+      # ignore rois with overlaps between fg_threshold and bg_threshold 
+      # mask are only defined on positive rois
+
+
+      # ignore_inds = np.where((max_overlaps < cfg.FLAGS.fg_threshold))[0]
+      # labels[ignore_inds] = -1 
+
+      mask_targets = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.float32)
+      mask_inside_weights = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.float32)
+      rois [rois < 0] = 0
+      
+      # TODO: speed bottleneck?
+      #logger=log()
+      for i in keep_inds:
+        roi = rois[i, :4]
+        #logger.info("""roi %d: %s""" % (i, roi))
+        cropped = gt_masks[gt_assignment[i], int(round(roi[1])):int(round(roi[3])), int(round(roi[0])):int(round(roi[2]))]
+        cropped = cv2.resize(cropped.astype(np.float32), (mask_width.astype(np.float32), mask_height.astype(np.float32)), interpolation=cv2.INTER_LINEAR)#INTER_NEAREST
+        
+        mask_targets[i, :, :, labels[i]] = cropped
+        #logger.info("""cropped %s""" % (cropped))
+        mask_inside_weights[i, :, :, labels[i]] = 1
+        # print("in mask.py rois: ", roi)
+      mask_rois = rois[:, :4]
+      # print("in mask.py rois2: ")
+      # print(mask_rois)
+  else:
+      # there is no gt
+      labels = np.zeros((total_masks, ), np.int32)
+      labels[:] = -1
+      mask_targets = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.float32)
+      mask_inside_weights = np.zeros((total_masks, mask_height, mask_height, num_classes), dtype=np.float32)
+      mask_rois = np.zeros((total_masks, 4), dtype=np.float32)
+  return labels, mask_targets, mask_inside_weights, mask_rois
 
 def decode(mask_targets, rois, classes, ih, iw):
   """Decode outputs into final masks
@@ -107,7 +197,7 @@ def decode(mask_targets, rois, classes, ih, iw):
     mask = mask_targets[i, :, :, k]
     h, w = rois[i, 3] - rois[i, 1] + 1, rois[i, 2] - rois[i, 0] + 1
     x, y = rois[i, 0], rois[i, 1]
-    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+    mask = cv2.resize(mask, (w, h))#INTER_NEAREST
     mask *= k
     
     # paint
@@ -130,7 +220,7 @@ if __name__ == '__main__':
     W, H = 200, 200
     M = 50
     
-    gt_masks = np.zeros((2, H, W), dtype=np.int32)
+    gt_masks = np.zeros((2, H, W), dtype=np.float32)
     gt_masks[0, 50:150, 50:150] = 1
     gt_masks[1, 100:150, 50:150] = 1
     gt_boxes = np.asarray(

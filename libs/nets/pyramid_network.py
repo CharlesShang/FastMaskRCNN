@@ -12,6 +12,7 @@ from libs.layers import anchor_decoder
 from libs.layers import roi_encoder
 from libs.layers import roi_decoder
 from libs.layers import mask_encoder
+from libs.layers import mask_encoder_
 from libs.layers import mask_decoder
 from libs.layers import gen_all_anchors
 from libs.layers import ROIAlign
@@ -23,7 +24,7 @@ from libs.layers import assign_boxes_
 from libs.layers import inst_inference
 from libs.visualization.summary_utils import visualize_bb, visualize_final_predictions, visualize_input
 
-_TRAIN_MASK = True
+_BN = False
 
 # mapping each stage to its' tensor features
 _networks_map = {
@@ -43,13 +44,15 @@ def _extra_conv_arg_scope_with_bn(weight_decay=0.00001,
                      activation_fn=None,
                      batch_norm_decay=0.997,
                      batch_norm_epsilon=1e-5,
-                     batch_norm_scale=True):
+                     batch_norm_scale=True,
+                     is_training=True):
 
   batch_norm_params = {
       'decay': batch_norm_decay,
       'epsilon': batch_norm_epsilon,
       'scale': batch_norm_scale,
       'updates_collections': tf.GraphKeys.UPDATE_OPS,
+      'is_training': is_training
   }
 
   with slim.arg_scope(
@@ -69,15 +72,16 @@ def _extra_conv_arg_scope(weight_decay=0.00001, activation_fn=None, normalizer_f
       [slim.conv2d, slim.conv2d_transpose],
       padding='SAME',
       weights_regularizer=slim.l2_regularizer(weight_decay),
-      weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
+      weights_initializer=slim.variance_scaling_initializer(),#tf.truncated_normal_initializer(stddev=0.001),
       activation_fn=activation_fn,
-      normalizer_fn=normalizer_fn,) as arg_sc:
+      normalizer_fn=normalizer_fn,):
     with slim.arg_scope(
       [slim.fully_connected],
           weights_regularizer=slim.l2_regularizer(weight_decay),
           weights_initializer=tf.truncated_normal_initializer(stddev=0.001),
           activation_fn=activation_fn,
-          normalizer_fn=normalizer_fn) as arg_sc:
+          normalizer_fn=normalizer_fn):
+      with slim.arg_scope([slim.max_pool2d], padding='SAME') as arg_sc: 
           return arg_sc
 
 def my_sigmoid(x):
@@ -157,7 +161,7 @@ def _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.1):
            tf.concat(values=[scores, new_scores], axis=0), \
            tf.concat(values=[batch_inds, new_batch_inds], axis=0)
 
-def build_pyramid(net_name, end_points, bilinear=True):
+def build_pyramid(net_name, end_points, bilinear=True, is_training=True):
   """build pyramid features from a typical network,
   assume each stage is 2 time larger than its top feature
   Returns:
@@ -169,8 +173,11 @@ def build_pyramid(net_name, end_points, bilinear=True):
   else:
     pyramid_map = net_name
   # pyramid['inputs'] = end_points['inputs']
-  #arg_scope = _extra_conv_arg_scope()
-  arg_scope = _extra_conv_arg_scope_with_bn()
+  if _BN is True:
+    arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
+  else:
+    arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
+  #
   with tf.variable_scope('pyramid'):
     with slim.arg_scope(arg_scope):
       
@@ -209,8 +216,10 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
     7. Build losses
   """
   outputs = {}
-  #arg_scope = _extra_conv_arg_scope(activation_fn=None)
-  arg_scope = _extra_conv_arg_scope_with_bn(activation_fn=None)
+  if _BN is True:
+    arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
+  else:
+    arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
   my_sigmoid = None
   with slim.arg_scope(arg_scope):
     with tf.variable_scope('pyramid'):
@@ -273,7 +282,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
             p = 'P%d'%i
             splitted_rois = assigned_rois[i-2]
             batch_inds = assigned_batch_inds[i-2]
-            cropped, boxes_in_crop = ROIAlign_(pyramid[p], splitted_rois, batch_inds, ih, iw, stride=2**i,
+            cropped, boxes_after_crop, boxes_before_crop, py_shape, ihiw = ROIAlign_(pyramid[p], splitted_rois, batch_inds, ih, iw, stride=2**i,
                                pooled_height=14, pooled_width=14)
             cropped_rois.append(cropped)
             ordered_rois.append(splitted_rois)
@@ -281,7 +290,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
             
         cropped_rois = tf.concat(values=cropped_rois, axis=0)
         ordered_rois = tf.concat(values=ordered_rois, axis=0)
-        #pyramid_feature = tf.concat(values=pyramid_feature, axis=0)
+        pyramid_feature = tf.concat(values=pyramid_feature, axis=0)
 
 
         outputs['ordered_rois'] = ordered_rois
@@ -328,8 +337,13 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
             splitted_classes = assigned_classes[i-2]
             splitted_prob = assigned_prob[i-2]
             batch_inds = assigned_batch_inds[i-2]
-            cropped, boxes_in_crop = ROIAlign_(pyramid[p], splitted_rois, batch_inds, ih, iw, stride=2**i,
+            cropped, boxes_after_crop, boxes_before_crop, py_shape, ihiw = ROIAlign_(pyramid[p], splitted_rois, batch_inds, ih, iw, stride=2**i,
                                pooled_height=14, pooled_width=14)
+            # if i is 3:
+            #   outputs['tmp_0'] = boxes_after_crop
+            #   outputs['tmp_1'] = boxes_before_crop
+            #   outputs['tmp_2'] = ihiw
+            #   outputs['tmp_3'] = py_shape
             cropped_rois.append(cropped)
             ordered_inst_boxes.append(splitted_rois)
             ordered_inst_classes.append(splitted_classes)
@@ -355,6 +369,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           
         # add a mask, given the predicted boxes and classes
         outputs['mask'] = {'mask':m, 'cls': classes, 'score': scores}
+        outputs['mask']['final_mask'] = tf.nn.sigmoid(m)
           
   return outputs
 
@@ -390,8 +405,10 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
   refine_batch_pos = []
   mask_batch_pos = []
 
-  #arg_scope = _extra_conv_arg_scope(activation_fn=None)
-  arg_scope = _extra_conv_arg_scope_with_bn(activation_fn=None)
+  if _BN is True:
+    arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
+  else:
+    arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
   with slim.arg_scope(arg_scope):
       with tf.variable_scope('pyramid'):
 
@@ -500,7 +517,7 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         tf.add_to_collection(tf.GraphKeys.LOSSES, refined_cls_loss)
         refined_cls_losses.append(refined_cls_loss)
 
-        outputs['tmp_3'] = labels
+        # outputs['tmp_3'] = labels
         outputs['tmp_4'] = classes
 
         # outputs['tmp_0'] = outputs['ordered_rois']
@@ -515,14 +532,15 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         # mask_shape = tf.shape(masks)
         # masks = tf.reshape(masks, (mask_shape[0], mask_shape[1],
         #                            mask_shape[2], tf.cast(mask_shape[3]/2, tf.int32), 2))
-        labels, mask_targets, mask_inside_weights = \
-          mask_encoder(gt_masks, gt_boxes, ordered_rois, num_classes, 28, 28, scope='MaskEncoder')
-        labels, masks, mask_targets, mask_inside_weights = \
+        labels, mask_targets, mask_inside_weights, mask_rois = \
+          mask_encoder_(gt_masks, gt_boxes, ordered_rois, num_classes, 28, 28, scope='MaskEncoder')
+        labels, masks, mask_targets, mask_inside_weights, mask_rois = \
                 _filter_negative_samples(tf.reshape(labels, [-1]), [
                     tf.reshape(labels, [-1]),
-                    masks,
-                    mask_targets, 
-                    mask_inside_weights, 
+                    tf.reshape(masks, [-1, 28, 28, num_classes]),
+                    tf.reshape(mask_targets, [-1, 28, 28, num_classes]),
+                    tf.reshape(mask_inside_weights, [-1, 28, 28, num_classes]),
+                    tf.reshape(mask_rois, [-1, 4])
                     ])
         # _, frac_ = _get_valid_sample_fraction(labels)
         mask_batch.append(
@@ -536,6 +554,13 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         # mask_targets = slim.one_hot_encoding(mask_targets, 2, on_value=1.0, off_value=0.0)
         # mask_binary_loss = mask_lw * tf.losses.softmax_cross_entropy(mask_targets, masks)
         # NOTE: w/o competition between classes. 
+        outputs['tmp_0'] = mask_rois
+        outputs['tmp_1'] = labels
+        outputs['tmp_2'] = tf.nn.sigmoid(masks)
+        outputs['tmp_3'] = mask_targets
+        # outputs['tmp_0'] = mask_rois
+        # outputs['tmp_1'] = mask_targets
+        # outputs['tmp_2'] = labels
         mask_targets = tf.cast(mask_targets, tf.float32)
         mask_loss = mask_lw * tf.nn.sigmoid_cross_entropy_with_logits(labels=mask_targets, logits=masks) 
         mask_loss = tf.reduce_mean(mask_loss) 
@@ -574,7 +599,7 @@ def build(end_points, image_height, image_width, pyramid_map,
         gt_masks, 
         loss_weights=[0.5, 0.5, 1.0, 0.5, 0.1]):
     
-    pyramid = build_pyramid(pyramid_map, end_points)
+    pyramid = build_pyramid(pyramid_map, end_points, is_training=is_training)
 
     for p in pyramid:
         print (p)

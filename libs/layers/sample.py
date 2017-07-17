@@ -120,7 +120,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
       	
 	# TODO: sampling strategy
       	bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8)#64
+      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 128)#64
       	if bg_inds.size > 0 and bg_rois < bg_inds.size:
            bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
@@ -128,7 +128,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
         #print(gt_boxes[np.argmax(overlaps[fg_inds],axis=1),4])
     else:
         bg_inds = np.arange(boxes.shape[0])
-        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 8)#64
+        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 128)#64
         if bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 

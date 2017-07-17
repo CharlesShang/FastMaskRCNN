@@ -62,6 +62,8 @@ def inference(boxes, classes, prob, class_agnostic=True):
         prob = prob[keeps, :]
         print("after nms:", len(classes))
 
+        # quick fix for tensorflow error when no bbox presents
+        #@TODO
         if len(classes) is 0:
             scores = np.zeros((1,81))
             boxes = np.array([[0.0,0.0,2.0,2.0]])

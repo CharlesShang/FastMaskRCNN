@@ -22,8 +22,12 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
         m = np.transpose(m,(0,3,1,2))
     if bbox is not None:
         for i, box in enumerate(bbox):
-            if label is not None:
+            if label is not None and not np.all(box==0):
                 if prob is not None:
+                    # print("prob")
+                    # print(prob.shape)
+                    # print("label")
+                    # print(label.shape)
                     if ((prob[i,label[i]] > vis_th) or (vis_all is True)) and ((ignore_bg is True) and (label[i] > 0)) :
                         if gt_label is not None:
                             if gt_label is not None and len(iou) > 1:
@@ -35,7 +39,7 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
                             else:
                                 color = '#0000ff'  
                         else: 
-                            text = cat_id_to_cls_name(label[i]) + ' : ' + str(prob[i][label[i]])[:4]
+                            text = cat_id_to_cls_name(label[i]) + ' : ' + str(i)#+ str(prob[i][label[i]])[:4]
                         draw.text((2+bbox[i,0], 2+bbox[i,1]), text, fill=color)
 
                         if _DEBUG is True:
@@ -44,7 +48,6 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
 
                         if mask is not None:
                             # print("mask number: ",i)
-                            # print(box)
                             box = np.floor(box).astype('uint16')
                             bbox_w = box[2]-box[0]
                             bbox_h = box[3]-box[1]
@@ -53,7 +56,7 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
                             color_img = Image.fromarray(color_img.astype('uint8')).convert('RGBA')
                             #color_img = Image.new("RGBA", (bbox_w,bbox_h), np.random.rand(1,3) * 255 )
                             # print(bbox_w, bbox_h, i, label[i], bbox.shape)
-                            resized_m = imresize(m[i][label[i]], [bbox_h, bbox_w], interp='nearest')
+                            resized_m = imresize(m[i][label[i]], [bbox_h, bbox_w], interp='bilinear') #label[i]
                             resized_m[resized_m >= 128] = 128
                             resized_m[resized_m < 128] = 0
                             resized_m = Image.fromarray(resized_m.astype('uint8'), 'L')

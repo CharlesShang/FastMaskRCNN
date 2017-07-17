@@ -48,7 +48,7 @@ def encode(gt_boxes, all_anchors, height, width, stride):
     total_anchors = all_anchors.shape[0]
 
     # labels = np.zeros((anchors.shape[0], ), dtype=np.float32)
-    labels = np.empty((anchors.shape[0], ), dtype=np.float32)
+    labels = np.empty((anchors.shape[0], ), dtype=np.int32)
     labels.fill(-1)
 
     if gt_boxes.size > 0:
@@ -133,7 +133,7 @@ def encode(gt_boxes, all_anchors, height, width, stride):
     if gt_boxes.size > 0:
         bbox_targets = _compute_targets(anchors, gt_boxes[gt_assignment, :])
     bbox_inside_weights = np.zeros((total_anchors, 4), dtype=np.float32)
-    bbox_inside_weights[labels == 1, :] = 0.1
+    bbox_inside_weights[labels == 1, :] = 1.0#0.1
 
     # # mapping to whole outputs
     # labels = _unmap(labels, total_anchors, inds_inside, fill=-1)

@@ -130,7 +130,7 @@ tf.app.flags.DEFINE_string(
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.002,
+tf.app.flags.DEFINE_float('learning_rate', 0.001,
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -226,13 +226,14 @@ tf.app.flags.DEFINE_boolean(
 #######################
 # BOX Flags #
 #######################
-tf.app.flags.DEFINE_float(
-    'rpn_bg_threshold', 0.3,
-    'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
     'rpn_fg_threshold', 0.7,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
+
+tf.app.flags.DEFINE_float(
+    'rpn_bg_threshold', 0.3,
+    'Only regions which intersection is less than bg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
     'fg_threshold', 0.7,
@@ -243,7 +244,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
-    'rois_per_image', 256,
+    'rois_per_image', 512,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(
@@ -298,7 +299,7 @@ tf.app.flags.DEFINE_float(
     'mask_threshold', 0.50,
     'Least intersection of a positive mask')
 tf.app.flags.DEFINE_integer(
-    'masks_per_image', 64,
+    'masks_per_image', 128,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(

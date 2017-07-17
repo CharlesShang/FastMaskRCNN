@@ -41,7 +41,7 @@ def encode(gt_boxes, rois, num_classes):
       max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
       # note: this will assign every rois with a positive label 
       # labels = gt_boxes[gt_assignment, 4]
-      labels = np.zeros([num_rois], dtype=np.float32)
+      labels = np.zeros([num_rois], dtype=np.int32)
       labels[:] = -1
 
       # if _DEBUG:
@@ -53,17 +53,17 @@ def encode(gt_boxes, rois, num_classes):
       fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
       if fg_inds.size > 0 and fg_rois < fg_inds.size:
         fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
-      labels[fg_inds] = gt_boxes[gt_assignment[fg_inds], 4] 
+      labels[fg_inds] = gt_boxes[gt_assignment[fg_inds], 4]
       
       # TODO: sampling strategy
       bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 64)
+      bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 128-fg_rois)#64
       if bg_inds.size > 0 and bg_rois < bg_inds.size:
         bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
       labels[bg_inds] = 0
       
       # ignore rois with overlaps between fg_threshold and bg_threshold 
-      ignore_inds = np.where(((max_overlaps > cfg.FLAGS.bg_threshold) &\
+      ignore_inds = np.where(((max_overlaps >= cfg.FLAGS.bg_threshold) &\
               (max_overlaps < cfg.FLAGS.fg_threshold)))[0]
       labels[ignore_inds] = -1 
 
@@ -88,10 +88,10 @@ def encode(gt_boxes, rois, num_classes):
    
   else:
       # there is no gt
-      labels = np.zeros((num_rois, ), np.float32)
+      labels = np.zeros((num_rois, ), np.int32)
       bbox_targets = np.zeros((num_rois, 4 * num_classes), np.float32)
       bbox_inside_weights = np.zeros((num_rois, 4 * num_classes), np.float32)
-      bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 64)
+      bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 128)#64
 
       if bg_rois < num_rois:
           bg_inds = np.arange(num_rois)

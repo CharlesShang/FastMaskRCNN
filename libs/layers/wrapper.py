@@ -21,7 +21,7 @@ def anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEn
     labels, bbox_targets, bbox_inside_weights = \
       tf.py_func(anchor.encode,
                  [gt_boxes, all_anchors, height, width, stride],
-                 [tf.float32, tf.float32, tf.float32])
+                 [tf.int32, tf.float32, tf.float32])
     labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='labels')
     bbox_targets = tf.convert_to_tensor(bbox_targets, name='bbox_targets')
     bbox_inside_weights = tf.convert_to_tensor(bbox_inside_weights, name='bbox_inside_weights')
@@ -55,7 +55,7 @@ def roi_encoder(gt_boxes, rois, num_classes, scope='ROIEncoder'):
     labels, bbox_targets, bbox_inside_weights, max_overlaps = \
       tf.py_func(roi.encode,
                 [gt_boxes, rois, num_classes],
-                [tf.float32, tf.float32, tf.float32, tf.float32]
+                [tf.int32, tf.float32, tf.float32, tf.float32]
                 )
     labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='labels')
     bbox_targets = tf.convert_to_tensor(bbox_targets, name='bbox_targets')
@@ -97,6 +97,23 @@ def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width,
     mask_inside_weights = tf.reshape(mask_inside_weights, (-1, mask_height, mask_width, num_classes))
   
   return labels, mask_targets, mask_inside_weights
+
+def mask_encoder_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, scope='MaskEncoder'):
+  
+  with tf.name_scope(scope) as sc:
+    labels, mask_targets, mask_inside_weights, mask_rois = \
+      tf.py_func(mask.encode_,
+                 [gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width],
+                 [tf.int32, tf.float32, tf.float32, tf.float32])
+    labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='classes')
+    mask_targets = tf.convert_to_tensor(mask_targets, name='mask_targets')
+    mask_inside_weights = tf.convert_to_tensor(mask_inside_weights, name='mask_inside_weights')
+    labels = tf.reshape(labels, (-1,))
+    mask_targets = tf.reshape(mask_targets, (-1, mask_height, mask_width, num_classes))
+    mask_inside_weights = tf.reshape(mask_inside_weights, (-1, mask_height, mask_width, num_classes))
+    mask_rois = tf.reshape(mask_rois,(-1, 4))
+  
+  return labels, mask_targets, mask_inside_weights, mask_rois
 
 def mask_decoder(mask_targets, rois, classes, ih, iw, scope='MaskDecoder'):
   
