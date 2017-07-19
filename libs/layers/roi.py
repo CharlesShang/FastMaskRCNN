@@ -13,7 +13,7 @@ from libs.logs.log import LOG
 
 _DEBUG = False 
 
-def encode(gt_boxes, rois, num_classes):
+def encode(gt_boxes, rois, num_classes, indexs):
   """Matching and Encoding groundtruth boxes (gt_boxes) into learning targets to boxes
   Sampling
   Parameters
@@ -99,7 +99,7 @@ def encode(gt_boxes, rois, num_classes):
           labels[ignore_inds] = -1 
       max_overlaps = labels
 
-  return labels, bbox_targets, bbox_inside_weights, max_overlaps.astype(np.float32)
+  return labels, bbox_targets, bbox_inside_weights, max_overlaps.astype(np.float32), indexs
 
 def decode(boxes, scores, rois, ih, iw):
   """Decode prediction targets into boxes and only keep only one boxes of greatest possibility for each rois

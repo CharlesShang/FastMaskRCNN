@@ -13,7 +13,7 @@ from libs.logs.log import LOG
 
 _DEBUG=False
 
-def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
+def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=False):
   """Sample boxes according to scores and some learning strategies
   assuming the first class is background
   Params:
@@ -41,11 +41,13 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
     keeps = np.where(scores > 0.5)[0]
     boxes = boxes[keeps, :]
     scores = scores[keeps]
+    indexs = indexs[keeps]
   
   # filter minimum size
   keeps = _filter_boxes(boxes, min_size=min_size)
   boxes = boxes[keeps, :]
   scores = scores[keeps]
+  indexs = indexs[keeps]
   
   # filter with scores
   order = scores.ravel().argsort()[::-1]
@@ -53,6 +55,7 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
     order = order[:pre_nms_top_n]
   boxes = boxes[order, :]
   scores = scores[order]
+  indexs = indexs[order]
 
   # filter with nms
   det = np.hstack((boxes, scores)).astype(np.float32)
@@ -61,7 +64,8 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   if post_nms_top_n > 0:
     keeps = keeps[:post_nms_top_n]
   boxes = boxes[keeps, :]
-  scores = scores[keeps]
+  scores = scores[keeps].astype(np.float32)
+  indexs = indexs[keeps]
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 
   # # random sample boxes
@@ -77,11 +81,11 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   #   ws = boxes[:, 2] - boxes[:, 0]
   #   assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
   
-  return boxes, scores.astype(np.float32), batch_inds
+  return boxes, scores, batch_inds, indexs
 
-def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, only_positive=False):
+def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training=False, only_positive=False):
     """sample boxes for refined output"""
-    boxes, scores, batch_inds = sample_rpn_outputs(boxes, scores, is_training, only_positive)
+    boxes, scores, batch_inds, indexs = sample_rpn_outputs(boxes, scores, indexs, is_training, only_positive)
 
     if gt_boxes.size > 0:
         overlaps = cython_bbox.bbox_overlaps(
@@ -138,7 +142,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
     
     
     return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds],\
-           boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds]
+           boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds], indexs[keep_inds]
 
 def _jitter_boxes(boxes, jitter=0.1):
     """ jitter the boxes before appending them into rois

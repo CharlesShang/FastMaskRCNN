@@ -13,7 +13,7 @@ from libs.logs.log import LOG
 
 _DEBUG = False
 
-def encode(gt_boxes, all_anchors, height, width, stride):
+def encode(gt_boxes, all_anchors, height, width, stride, indexs):
     """Matching and Encoding groundtruth into learning targets
     Sampling
     
@@ -141,10 +141,12 @@ def encode(gt_boxes, all_anchors, height, width, stride):
     # bbox_inside_weights = _unmap(bbox_inside_weights, total_anchors, inds_inside, fill=0)
 
     labels = labels.reshape((1, height, width, -1))
+    indexs = indexs.reshape((1, height, width, -1))
     bbox_targets = bbox_targets.reshape((1, height, width, -1))
     bbox_inside_weights = bbox_inside_weights.reshape((1, height, width, -1))
 
-    return labels, bbox_targets, bbox_inside_weights
+
+    return labels, bbox_targets, bbox_inside_weights, indexs
 
 def decode(boxes, scores, all_anchors, ih, iw):
     """Decode outputs into boxes
@@ -169,13 +171,15 @@ def decode(boxes, scores, all_anchors, ih, iw):
     scores = scores.reshape((-1, 2))
     assert scores.shape[0] == boxes.shape[0] == all_anchors.shape[0], \
       'Anchor layer shape error %d vs %d vs %d' % (scores.shape[0],boxes.shape[0],all_anchors.reshape[0])
+    index = np.arange(scores.shape[0]).astype(np.int32)
     boxes = bbox_transform_inv(all_anchors, boxes)
     classes = np.argmax(scores, axis=1)
     scores = scores[:, 1]
     final_boxes = boxes  
     final_boxes = clip_boxes(final_boxes, (ih, iw))
     classes = classes.astype(np.int32)
-    return final_boxes, classes, scores
+
+    return final_boxes, classes, scores, index
 
 def sample(boxes, scores, ih, iw, is_training):
     """
