@@ -227,7 +227,7 @@ def train():
     cropped_rois = tf.get_collection('__CROPPED__')[0]
     transposed = tf.get_collection('__TRANSPOSED__')[0]
     
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.85)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     init_op = tf.group(
             tf.global_variables_initializer(),
