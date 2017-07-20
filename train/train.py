@@ -68,6 +68,7 @@ def solve(global_step):
 
 def restore(sess):
      """choose which param to restore"""
+     is_restored = False
      if FLAGS.restore_previous_if_exists:
         try:
             checkpoint_path = tf.train.latest_checkpoint(FLAGS.train_dir)
@@ -125,16 +126,17 @@ def restore(sess):
             ############
 
             restorer.restore(sess, checkpoint_path)
+            is_restored = True
             print ('restored previous model %s from %s'\
                     %(checkpoint_path, FLAGS.train_dir))
             time.sleep(2)
             return
         except:
-            print ('--restore_previous_if_exists is set, but failed to restore in %s %s'\
+            print ('--restore_previous_if_exists is set, but FAILED TO RESTORE in %s %s'\
                     % (FLAGS.train_dir, checkpoint_path))
             time.sleep(2)
 
-     if FLAGS.pretrained_model:
+     if FLAGS.pretrained_model and not is_restored:
         if tf.gfile.IsDirectory(FLAGS.pretrained_model):
             checkpoint_path = tf.train.latest_checkpoint(FLAGS.pretrained_model)
         else:
@@ -161,6 +163,8 @@ def restore(sess):
     
 def train():
     """The main function that runs training"""
+
+    print("Starting learning rate %.7f"%(FLAGS.learning_rate))
 
     ## data
     image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = \
@@ -222,6 +226,7 @@ def train():
 
     ## solvers
     global_step = slim.create_global_step()
+    # global_step = tf.Variable(0, name='global_step', trainable=False)
     update_op = solve(global_step)
 
     cropped_rois = tf.get_collection('__CROPPED__')[0]
@@ -325,10 +330,10 @@ def train():
             summary_writer.add_summary(summary_str, step)
             summary_writer.flush()
 
-        if (step % 10000 == 0 or step + 1 == FLAGS.max_iters) and step != 0:
+        if (step % FLAGS.train_checkpoint_interval == 0 or step + 1 == FLAGS.max_iters) and step != 0:
             checkpoint_path = os.path.join(FLAGS.train_dir, 
                                            FLAGS.dataset_name + '_' + FLAGS.network + '_model.ckpt')
-            saver.save(sess, checkpoint_path, global_step=step)
+            saver.save(sess, checkpoint_path, global_step=global_step)
 
         if coord.should_stop():
             coord.request_stop()
