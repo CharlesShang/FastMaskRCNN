@@ -25,10 +25,10 @@ _TRAIN_MASK = True
 
 # mapping each stage to its' tensor features
 _networks_map = {
-  'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
-               'C2':'resnet_v1_50/block1/unit_2/bottleneck_v1',
-               'C3':'resnet_v1_50/block2/unit_3/bottleneck_v1',
-               'C4':'resnet_v1_50/block3/unit_5/bottleneck_v1',
+  'resnet50': {#'C1':'resnet_v1_50/conv1',
+               'C2':'resnet_v1_50/block1/unit_3/bottleneck_v1',
+               'C3':'resnet_v1_50/block2/unit_4/bottleneck_v1',
+               'C4':'resnet_v1_50/block3/unit_6/bottleneck_v1',
                'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
                },
   'resnet101': {'C1': '', 'C2': '',
