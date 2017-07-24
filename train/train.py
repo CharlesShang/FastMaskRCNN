@@ -199,7 +199,7 @@ def train():
             base_anchors=9,
             is_training=True,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
-            loss_weights=[1.0, 0.1, 1.0, 0.1, 0.1])
+            loss_weights=[0.1, 0.1, 1.0, 0.1, 1.0])
             #loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
 
 
@@ -224,12 +224,14 @@ def train():
     tmp_2 = outputs['losses']
     tmp_3 = outputs['losses']
     tmp_4 = outputs['losses']
+    tmp_5 = outputs['losses']
 
     tmp_0 = outputs['tmp_0']
     tmp_1 = outputs['tmp_1']
     tmp_2 = outputs['tmp_2']
     tmp_3 = outputs['tmp_3']
     tmp_4 = outputs['tmp_4']
+    tmp_5 = outputs['tmp_5']
     ############################
 
 
@@ -276,16 +278,16 @@ def train():
         rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss, \
         gt_boxesnp, \
         rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch, \
-        input_imagenp, final_boxnp, final_clsnp, final_probnp, final_gt_clsnp, final_rpn_boxnp, final_max_overlapsnp, final_masknp, gtnp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np= \
+        input_imagenp, final_boxnp, final_clsnp, final_probnp, final_gt_clsnp, final_rpn_boxnp, final_max_overlapsnp, final_masknp, gtnp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np, tmp_5np= \
                      sess.run([update_op, total_loss, regular_loss, img_id] + 
                               losses + 
                               [gt_boxes] + 
                               batch_info + 
-                              [input_image] + [final_box] + [final_cls] + [final_prob] + [final_gt_cls] + [final_rpn_box] + [final_max_overlaps] + [final_mask] + [gt] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4])
+                              [input_image] + [final_box] + [final_cls] + [final_prob] + [final_gt_cls] + [final_rpn_box] + [final_max_overlaps] + [final_mask] + [gt] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4] + [tmp_5])
 
         duration_time = time.time() - start_time
         if step % 1 == 0: 
-            logger.info ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
+            print ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
                     """total-loss %.4f(%.4f, %.4f, %.6f, %.4f, %.4f), """
                     """instances: %d, """
                     """batch:(%d|%d, %d|%d, %d|%d)""" 
@@ -293,15 +295,21 @@ def train():
                       tot_loss, rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss,
                       gt_boxesnp.shape[0], 
                       rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch))
-            # logger.info (np.array(tmp_0np).shape)
-            # logger.info (np.array(tmp_1np).shape)
-            # logger.info (np.array(tmp_2np).shape)
-            # logger.info (np.array(tmp_3np).shape)
-            # logger.info (np.array(tmp_4np).shape)
-            # logger.info (np.amax(np.array(tmp_4np)))
-            # logger.info (np.amin(np.array(tmp_4np)))
+            # print (np.array(tmp_0np).shape)
+            # print (np.array(tmp_1np).shape)
+            # print (np.array(tmp_2np).shape)
+            # print (np.array(tmp_3np).shape)
+            # print (np.array(tmp_4np).shape)
+            # print (np.amax(np.array(tmp_4np)))
+            # print (np.amin(np.array(tmp_4np)))
 
-            #logger.info (np.array_equal(np.array(tmp_0np)[np.array(tmp_4np)], np.array(tmp_3np)))  
+            #print (np.array_equal(np.array(tmp_0np)[np.array(tmp_4np)], np.array(tmp_3np)))  
+            #print (np.array(tmp_3np))
+
+            print ("labels")
+            print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_5np),axis=1))))
+            print ("classes")
+            print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
 
 
         if step % 50 == 0: 
@@ -335,10 +343,10 @@ def train():
                       mask=tmp_3np,
                       vis_all=True)
             
-            # logger.info ("labels")
-            # logger.info (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
-            # logger.info ("classes")
-            # logger.info (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
+            # print ("labels")
+            # print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
+            # print ("classes")
+            # print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
             
             
             if np.isnan(tot_loss) or np.isinf(tot_loss):

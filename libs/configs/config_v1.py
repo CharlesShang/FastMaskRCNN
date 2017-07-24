@@ -130,7 +130,7 @@ tf.app.flags.DEFINE_string(
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.001,
+tf.app.flags.DEFINE_float('learning_rate', 0.0002,
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -276,7 +276,7 @@ tf.app.flags.DEFINE_integer(
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_inst_n', 200,
+    'post_nms_inst_n', 300,
     "Number of inst after NMS")
 
 tf.app.flags.DEFINE_float(
@@ -299,7 +299,7 @@ tf.app.flags.DEFINE_float(
     'mask_threshold', 0.50,
     'Least intersection of a positive mask')
 tf.app.flags.DEFINE_integer(
-    'masks_per_image', 128,
+    'masks_per_image', 512,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(

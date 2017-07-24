@@ -188,10 +188,10 @@ def sample_wrapper(boxes, scores, indexs, is_training=True, scope='SampleBoxes')
 def sample_with_gt_wrapper(boxes, scores, gt_boxes, indexs, is_training=True, scope='SampleBoxesWithGT'):
   
   with tf.name_scope(scope) as sc:
-    boxes, scores, batch_inds, mask_boxes, mask_scores, mask_batch_inds, indexs = \
+    boxes, scores, batch_inds, indexs, mask_boxes, mask_scores, mask_batch_inds, mask_indexs = \
       tf.py_func(sample.sample_rpn_outputs_wrt_gt_boxes,
                  [boxes, scores, gt_boxes, indexs, is_training],
-                 [tf.float32, tf.float32, tf.int32, tf.float32, tf.float32, tf.int32, tf.int32])
+                 [tf.float32, tf.float32, tf.int32, tf.int32, tf.float32, tf.float32, tf.int32, tf.int32])
     boxes = tf.convert_to_tensor(boxes, name='Boxes')
     scores = tf.convert_to_tensor(scores, name='Scores')
     batch_inds = tf.convert_to_tensor(batch_inds, name='BatchInds')
@@ -200,8 +200,9 @@ def sample_with_gt_wrapper(boxes, scores, gt_boxes, indexs, is_training=True, sc
     mask_boxes = tf.convert_to_tensor(mask_boxes, name='MaskBoxes')
     mask_scores = tf.convert_to_tensor(mask_scores, name='MaskScores')
     mask_batch_inds = tf.convert_to_tensor(mask_batch_inds, name='MaskBatchInds')
+    mask_indexs = tf.convert_to_tensor(mask_indexs, name='Indexs')
   
-  return boxes, scores, batch_inds, mask_boxes, mask_scores, mask_batch_inds, indexs
+  return boxes, scores, batch_inds, indexs, mask_boxes, mask_scores, mask_batch_inds, mask_indexs
 
 def gen_all_anchors(height, width, stride, scales, scope='GenAnchors'):
   
