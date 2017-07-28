@@ -35,7 +35,7 @@ def anchor_encoder(gt_boxes, all_anchors, height, width, stride, indexs, scope='
     bbox_inside_weights = tf.reshape(bbox_inside_weights, (1, height, width, -1))
 
   
-  return labels, bbox_targets, bbox_inside_weights, indexs
+    return labels, bbox_targets, bbox_inside_weights, indexs
 
 
 def anchor_decoder(boxes, scores, all_anchors, ih, iw, scope='AnchorDecoder'):
@@ -56,7 +56,7 @@ def anchor_decoder(boxes, scores, all_anchors, ih, iw, scope='AnchorDecoder'):
     classes = tf.reshape(classes, (-1, ))
     scores = tf.reshape(scores, (-1, ))
   
-  return final_boxes, classes, scores, indexs
+    return final_boxes, classes, scores, indexs
 
 
 def roi_encoder(gt_boxes, rois, num_classes, indexs, scope='ROIEncoder'):
@@ -78,7 +78,7 @@ def roi_encoder(gt_boxes, rois, num_classes, indexs, scope='ROIEncoder'):
     bbox_inside_weights = tf.reshape(bbox_inside_weights, (-1, num_classes * 4))
     max_overlaps = tf.reshape(max_overlaps,(-1, ))
   
-  return labels, bbox_targets, bbox_inside_weights, max_overlaps, indexs
+    return labels, bbox_targets, bbox_inside_weights, max_overlaps, indexs
 
 
 def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):
@@ -93,7 +93,7 @@ def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):
     scores = tf.convert_to_tensor(scores, name='scores')
     final_boxes = tf.reshape(final_boxes, (-1, 4))
     
-  return final_boxes, classes, scores
+    return final_boxes, classes, scores
 
 def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, scope='MaskEncoder'):
   
@@ -109,7 +109,7 @@ def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width,
     mask_targets = tf.reshape(mask_targets, (-1, mask_height, mask_width, num_classes))
     mask_inside_weights = tf.reshape(mask_inside_weights, (-1, mask_height, mask_width, num_classes))
   
-  return labels, mask_targets, mask_inside_weights
+    return labels, mask_targets, mask_inside_weights
 
 # def mask_encoder_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, indexs, scope='MaskEncoder'):
   
@@ -152,7 +152,7 @@ def mask_encoder_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width
     mask_inside_weights = tf.reshape(mask_inside_weights, (-1, mask_height, mask_width, num_classes))
     mask_rois = tf.reshape(mask_rois,(-1, 4))
   
-  return labels, mask_targets, mask_inside_weights, mask_rois, indexs
+    return labels, mask_targets, mask_inside_weights, mask_rois, indexs
 
 def mask_decoder(mask_targets, rois, classes, ih, iw, scope='MaskDecoder'):
   
@@ -164,7 +164,7 @@ def mask_decoder(mask_targets, rois, classes, ih, iw, scope='MaskDecoder'):
     Mask = tf.convert_to_tensor(Mask, name='MaskImage')
     Mask = tf.reshape(Mask, (ih, iw))
   
-  return Mask
+    return Mask
 
 
 def sample_wrapper(boxes, scores, indexs, is_training=True, scope='SampleBoxes'):
@@ -183,7 +183,7 @@ def sample_wrapper(boxes, scores, indexs, is_training=True, scope='SampleBoxes')
     batch_inds = tf.reshape(batch_inds, [-1])
     indexs = tf.reshape(indexs, [-1])
   
-  return boxes, scores, batch_inds, indexs
+    return boxes, scores, batch_inds, indexs
 
 def sample_with_gt_wrapper(boxes, scores, gt_boxes, indexs, is_training=True, scope='SampleBoxesWithGT'):
   
@@ -202,7 +202,7 @@ def sample_with_gt_wrapper(boxes, scores, gt_boxes, indexs, is_training=True, sc
     mask_batch_inds = tf.convert_to_tensor(mask_batch_inds, name='MaskBatchInds')
     mask_indexs = tf.convert_to_tensor(mask_indexs, name='Indexs')
   
-  return boxes, scores, batch_inds, indexs, mask_boxes, mask_scores, mask_batch_inds, mask_indexs
+    return boxes, scores, batch_inds, indexs, mask_boxes, mask_scores, mask_batch_inds, mask_indexs
 
 def gen_all_anchors(height, width, stride, scales, scope='GenAnchors'):
   
@@ -272,9 +272,9 @@ def inst_inference(final_boxes, classes, cls2_prob, scope='instInference'):
                        [final_boxes, classes, cls2_prob],
                        [tf.float32, tf.int32, tf.float32, tf.int32])
 
-    inst_boxes = tf.convert_to_tensor(inst_boxes, name='instBoxes')
-    inst_classes = tf.convert_to_tensor(inst_classes, name='instClasses')
-    inst_prob = tf.convert_to_tensor(inst_prob, name='instProb')
-    batch_inds = tf.convert_to_tensor(batch_inds, name='BatchInds')
+        inst_boxes = tf.convert_to_tensor(inst_boxes, name='instBoxes')
+        inst_classes = tf.convert_to_tensor(inst_classes, name='instClasses')
+        inst_prob = tf.convert_to_tensor(inst_prob, name='instProb')
+        batch_inds = tf.convert_to_tensor(batch_inds, name='BatchInds')
 
-    return [inst_boxes] + [inst_classes] + [inst_prob] + [batch_inds]
+        return [inst_boxes] + [inst_classes] + [inst_prob] + [batch_inds]

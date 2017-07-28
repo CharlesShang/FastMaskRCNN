@@ -79,8 +79,6 @@ def encode(gt_boxes, rois, num_classes, indexs):
           print ('cfg.FLAGS.bg_threshold:', cfg.FLAGS.bg_threshold)
           # print (max_overlaps)
 
-          LOG('ROIEncoder: %d positive rois, %d negative rois' % (len(fg_inds), len(bg_inds)))
-
       bbox_targets, bbox_inside_weights = _compute_targets(
         rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
       bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)

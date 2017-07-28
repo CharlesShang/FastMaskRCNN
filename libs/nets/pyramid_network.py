@@ -219,6 +219,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
     arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
+    
   with slim.arg_scope(arg_scope):
     with tf.variable_scope('pyramid'):
         # for p in pyramid:
@@ -428,12 +429,12 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         outputs['mask'] = {'mask':m}
         outputs['mask']['final_mask'] = tf.nn.sigmoid(m)
           
-  return outputs
+        return outputs
 
 def build_losses(pyramid, outputs, gt_boxes, gt_masks,
                  num_classes, base_anchors,
-                 rpn_box_lw =1.0, rpn_cls_lw = 1.0,
-                 refined_box_lw=1.0, refined_cls_lw=1.0,
+                 rpn_box_lw =0.1, rpn_cls_lw = 0.1,
+                 refined_box_lw=1.0, refined_cls_lw=0.1,
                  mask_lw=1.0):
   """Building 3-way output losses, totally 5 losses
   Params:
@@ -647,24 +648,24 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         tf.add_to_collection(tf.GraphKeys.LOSSES, mask_loss)
         mask_losses.append(mask_loss)
 
-  rpn_box_losses = tf.add_n(rpn_box_losses)
-  rpn_cls_losses = tf.add_n(rpn_cls_losses)
-  refined_box_losses = tf.add_n(refined_box_losses)
-  refined_cls_losses = tf.add_n(refined_cls_losses)
-  mask_losses = tf.add_n(mask_losses)
-  losses = [rpn_box_losses, rpn_cls_losses, refined_box_losses, refined_cls_losses, mask_losses]
-  total_loss = tf.add_n(losses)
+        rpn_box_losses = tf.add_n(rpn_box_losses)
+        rpn_cls_losses = tf.add_n(rpn_cls_losses)
+        refined_box_losses = tf.add_n(refined_box_losses)
+        refined_cls_losses = tf.add_n(refined_cls_losses)
+        mask_losses = tf.add_n(mask_losses)
+        losses = [rpn_box_losses, rpn_cls_losses, refined_box_losses, refined_cls_losses, mask_losses]
+        total_loss = tf.add_n(losses)
 
-  rpn_batch = tf.cast(tf.add_n(rpn_batch), tf.float32)
-  refine_batch = tf.cast(tf.add_n(refine_batch), tf.float32)
-  mask_batch = tf.cast(tf.add_n(mask_batch), tf.float32)
-  rpn_batch_pos = tf.cast(tf.add_n(rpn_batch_pos), tf.float32)
-  refine_batch_pos = tf.cast(tf.add_n(refine_batch_pos), tf.float32)
-  mask_batch_pos = tf.cast(tf.add_n(mask_batch_pos), tf.float32)
-    
-  return total_loss, losses, [rpn_batch_pos, rpn_batch, \
-                              refine_batch_pos, refine_batch, \
-                              mask_batch_pos, mask_batch]
+        rpn_batch = tf.cast(tf.add_n(rpn_batch), tf.float32)
+        refine_batch = tf.cast(tf.add_n(refine_batch), tf.float32)
+        mask_batch = tf.cast(tf.add_n(mask_batch), tf.float32)
+        rpn_batch_pos = tf.cast(tf.add_n(rpn_batch_pos), tf.float32)
+        refine_batch_pos = tf.cast(tf.add_n(refine_batch_pos), tf.float32)
+        mask_batch_pos = tf.cast(tf.add_n(mask_batch_pos), tf.float32)
+          
+        return total_loss, losses, [rpn_batch_pos, rpn_batch, \
+                                    refine_batch_pos, refine_batch, \
+                                    mask_batch_pos, mask_batch]
 
 def decode_output(outputs):
     """decode outputs into boxes and masks"""
@@ -676,7 +677,7 @@ def build(end_points, image_height, image_width, pyramid_map,
         is_training,
         gt_boxes,
         gt_masks, 
-        loss_weights=[0.5, 0.5, 1.0, 0.5, 0.1]):
+        loss_weights=[0.1, 0.1, 1.0, 0.1, 1.0]):
     
     pyramid = build_pyramid(pyramid_map, end_points, is_training=is_training)
 

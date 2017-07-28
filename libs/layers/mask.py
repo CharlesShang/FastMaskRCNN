@@ -8,18 +8,10 @@ import cv2
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.logs.log import LOG
-import logging
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 import tensorflow as tf
 
 _DEBUG = False 
-def log(file_name='log'):
-  logger = logging.getLogger(__name__)
-  logger.setLevel(logging.INFO)
-  handler = logging.FileHandler(file_name+'.log')
-  handler.setLevel(logging.INFO)
-  logger.addHandler(handler)
-  return logger
 
 def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   """Encode masks groundtruth into learnable targets
@@ -59,8 +51,6 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       num_masks = int(min(keep_inds.size, cfg.FLAGS.masks_per_image))
       if keep_inds.size > 0 and num_masks < keep_inds.size:
         keep_inds = np.random.choice(keep_inds, size=num_masks, replace=False)
-        LOG('Masks: %d of %d rois are considered positive mask. Number of masks %d'\
-                     %(num_masks, rois.shape[0], gt_masks.shape[0]))
 
       labels[keep_inds] = gt_boxes[gt_assignment[keep_inds], -1]
         
@@ -130,8 +120,6 @@ def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, inde
       num_masks = int(min(keep_inds.size, cfg.FLAGS.masks_per_image))
       if keep_inds.size > 0 and num_masks < keep_inds.size:
         keep_inds = np.random.choice(keep_inds, size=num_masks, replace=False)
-        LOG('Masks: %d of %d rois are considered positive mask. Number of masks %d'\
-                     %(num_masks, rois.shape[0], gt_masks.shape[0]))
 
       labels[keep_inds] = gt_boxes[gt_assignment[keep_inds], -1]
 
@@ -140,7 +128,6 @@ def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, inde
       rois [rois < 0] = 0
       
       # TODO: speed bottleneck?
-      #logger=log()
       for i in keep_inds:
 
         gt_height = gt_masks.shape[1]
@@ -149,7 +136,6 @@ def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, inde
         enlarged_height = mask_height*50
 
         roi = rois[i, :4]
-        #logger.info("""roi %d: %s""" % (i, roi))
         cropped = gt_masks[gt_assignment[i], :, :]
         # print("start")
         # print(cropped.shape)
@@ -165,7 +151,6 @@ def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, inde
 
 
         # roi = rois[i, :4]
-        # #logger.info("""roi %d: %s""" % (i, roi))
         # enlarged_width = (mask_width*50.0).astype(np.float32)
         # enlarged_height = (mask_height*50.0).astype(np.float32)
 
@@ -175,7 +160,6 @@ def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, inde
         # cropped = cv2.resize(cropped.astype(np.float32), (mask_width.astype(np.float32), mask_height.astype(np.float32)), interpolation=cv2.INTER_LINEAR)
         
         mask_targets[i, :, :, labels[i]] = cropped
-        #logger.info("""cropped %s""" % (cropped))
         mask_inside_weights[i, :, :, labels[i]] = 1
         # print("in mask.py rois: ", roi)
       mask_rois = rois[:, :4]
@@ -228,9 +212,7 @@ def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, inde
 #       num_masks = int(min(keep_inds.size, cfg.FLAGS.masks_per_image))
 #       if keep_inds.size > 0 and num_masks < keep_inds.size:
 #         keep_inds = np.random.choice(keep_inds, size=num_masks, replace=False)
-#         LOG('Masks: %d of %d rois are considered positive mask. Number of masks %d'\
-#                      %(num_masks, rois.shape[0], gt_masks.shape[0]))
-
+#         
 #       labels[keep_inds] = gt_boxes[gt_assignment[keep_inds], -1]
 
 #       mask_targets = np.zeros((total_masks, mask_height, mask_width, num_classes), dtype=np.float32)
@@ -238,15 +220,12 @@ def encode_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, inde
 #       rois [rois < 0] = 0
       
 #       # TODO: speed bottleneck?
-#       #logger=log()
 #       for i in keep_inds:
 #         roi = rois[i, :4]
-#         #logger.info("""roi %d: %s""" % (i, roi))
 #         cropped = gt_masks[gt_assignment[i], int(round(roi[1])):int(round(roi[3])), int(round(roi[0])):int(round(roi[2]))]
 #         cropped = cv2.resize(cropped.astype(np.float32), (mask_width.astype(np.float32), mask_height.astype(np.float32)), interpolation=cv2.INTER_LINEAR)
         
 #         mask_targets[i, :, :, labels[i]] = cropped
-#         #logger.info("""cropped %s""" % (cropped))
 #         mask_inside_weights[i, :, :, labels[i]] = 1
 #         # print("in mask.py rois: ", roi)
 #       mask_rois = rois[:, :4]
