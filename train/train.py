@@ -190,7 +190,7 @@ def train():
             base_anchors=9,
             is_training=True,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
-            loss_weights=[1, 1, 1000.0, 10.0, 100.0])
+            loss_weights=[1.0, 1.0, 1000.0, 10.0, 100.0])
             #loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
 
 
@@ -198,25 +198,16 @@ def train():
     losses  = outputs['losses']
     batch_info = outputs['batch_info']
     regular_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-    
     input_image = end_points['input']
-    # final_box = outputs['final_boxes']['box']
-    # final_cls = outputs['final_boxes']['cls']
-    # final_prob = outputs['final_boxes']['prob']
-    # final_gt_cls = outputs['final_boxes']['gt_cls']
-    # final_rpn_box = outputs['final_boxes']['rpn_box']
-    # final_max_overlaps = outputs['final_boxes']['max_overlaps']
-    # final_mask = outputs['mask']['mask']#outputs['mask']['final_mask']
-    # gt = outputs['gt']
+
+    training_rcnn_clses                 = outputs['training_rcnn_clses']
+    training_rcnn_clses_target          = outputs['training_rcnn_clses_target'] 
+    training_mask_rois                  = outputs['training_mask_rois']
+    training_mask_clses_target          = outputs['training_mask_clses_target']
+    training_mask_final_mask            = outputs['training_mask_final_mask']
+    training_mask_final_mask_target     = outputs['training_mask_final_mask_target']
 
     #############################
-    # tmp_0 = outputs['losses']
-    # tmp_1 = outputs['losses']
-    # tmp_2 = outputs['losses']
-    # tmp_3 = outputs['losses']
-    # tmp_4 = outputs['losses']
-    # tmp_5 = outputs['losses']
-
     tmp_0 = outputs['tmp_0']
     tmp_1 = outputs['tmp_1']
     tmp_2 = outputs['tmp_2']
@@ -266,15 +257,17 @@ def train():
         start_time = time.time()
 
         s_, tot_loss, reg_lossnp, img_id_str, \
-        rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss, \
+        rpn_box_loss, rpn_cls_loss, rcnn_box_loss, rcnn_cls_loss, mask_loss, \
         gt_boxesnp, \
-        rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch, \
-        input_imagenp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np, tmp_5np= \
+        rpn_batch_pos, rpn_batch, rcnn_batch_pos, rcnn_batch, mask_batch_pos, mask_batch, \
+        input_imagenp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np, tmp_5np, \
+        training_rcnn_clsesnp, training_rcnn_clses_targetnp, training_mask_roisnp, training_mask_clses_targetnp, training_mask_final_masknp, training_mask_final_mask_targetnp  = \
                      sess.run([update_op, total_loss, regular_loss, img_id] + 
                               losses + 
                               [gt_boxes] + 
                               batch_info + 
-                              [input_image] +  [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4] + [tmp_5])
+                              [input_image] +  [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4] + [tmp_5] +
+                              [training_rcnn_clses] + [training_rcnn_clses_target] + [training_mask_rois] + [training_mask_clses_target] + [training_mask_final_mask] + [training_mask_final_mask_target])
         # final_boxnp, final_clsnp, final_probnp, final_gt_clsnp, final_rpn_boxnp, final_max_overlapsnp, final_masknp, gtnp,
         #[final_box] + [final_cls] + [final_prob] + [final_gt_cls] + [final_rpn_box] + [final_max_overlaps] + [final_mask] + [gt] +
         duration_time = time.time() - start_time
@@ -284,61 +277,35 @@ def train():
                     """instances: %d, """
                     """batch:(%d|%d, %d|%d, %d|%d)""" 
                    % (step, img_id_str, duration_time, reg_lossnp, 
-                      tot_loss, rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss,
+                      tot_loss, rpn_box_loss, rpn_cls_loss, rcnn_box_loss, rcnn_cls_loss, mask_loss,
                       gt_boxesnp.shape[0], 
-                      rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch))
+                      rpn_batch_pos, rpn_batch, rcnn_batch_pos, rcnn_batch, mask_batch_pos, mask_batch))
             # print (np.array(tmp_0np).shape)
             # print (np.array(tmp_1np).shape)
-            # print (np.array(tmp_2np).shape)
-            # print (np.array(tmp_3np).shape)
-            # print (np.array(tmp_4np).shape)
-            # print (np.amax(np.array(tmp_4np)))
-            # print (np.amin(np.array(tmp_4np)))
 
-            #print (np.array_equal(np.array(tmp_0np)[np.array(tmp_4np)], np.array(tmp_3np)))  
-            #print (np.array(tmp_3np))
-
-            print ("labels")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_5np),axis=1))))
-            print ("classes")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
+            print ("target")
+            print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(training_rcnn_clses_targetnp),axis=1))))
+            print ("predict")
+            print (cat_id_to_cls_name(np.unique(np.argmax(np.array(training_rcnn_clsesnp),axis=1))))
 
         if step % 50 == 0: 
-            # draw_bbox(step, 
-            #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
-            #           name='train_est', 
-            #           bbox=final_rpn_boxnp, 
-            #           label=final_clsnp, 
-            #           prob=final_probnp,
-            #           mask=final_masknp,
-            #           gt_label=np.argmax(np.asarray(final_gt_clsnp),axis=1),
-            #           iou=final_max_overlapsnp,
-            #           vis_all=True
-            #           )
-
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
                       name='train_est', 
-                      bbox=tmp_0np, 
-                      label=tmp_1np, 
-                  	  prob=np.zeros((tmp_2np.shape[0],81), dtype=np.float32)+1.0,
-                      mask=tmp_2np,
+                      bbox=training_mask_roisnp, 
+                      label=training_mask_clses_targetnp, 
+                  	  prob=np.zeros((training_mask_final_masknp.shape[0],81), dtype=np.float32)+1.0,
+                      mask=training_mask_final_masknp,
                       vis_all=True)
 
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
                       name='train_gt', 
-                      bbox=tmp_0np, 
-                      label=tmp_1np, 
-                  	  prob=np.zeros((tmp_2np.shape[0],81), dtype=np.float32)+1.0,
-                      mask=tmp_3np,
+                      bbox=training_mask_roisnp, 
+                      label=training_mask_clses_targetnp, 
+                  	  prob=np.zeros((training_mask_final_masknp.shape[0],81), dtype=np.float32)+1.0,
+                      mask=training_mask_final_mask_targetnp,
                       vis_all=True)
-            
-            # print ("labels")
-            # print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(tmp_3np),axis=1)))[1:])
-            # print ("classes")
-            # print (cat_id_to_cls_name(np.unique(np.argmax(np.array(tmp_4np),axis=1))))
-            
             
             if np.isnan(tot_loss) or np.isinf(tot_loss):
                 print (gt_boxesnp)

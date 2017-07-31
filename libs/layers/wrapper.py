@@ -95,22 +95,6 @@ def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):
     
     return final_boxes, classes, scores
 
-def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, scope='MaskEncoder'):
-  
-  with tf.name_scope(scope) as sc:
-    labels, mask_targets, mask_inside_weights = \
-      tf.py_func(mask.encode,
-                 [gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width],
-                 [tf.float32, tf.int32, tf.float32])
-    labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='classes')
-    mask_targets = tf.convert_to_tensor(mask_targets, name='mask_targets')
-    mask_inside_weights = tf.convert_to_tensor(mask_inside_weights, name='mask_inside_weights')
-    labels = tf.reshape(labels, (-1,))
-    mask_targets = tf.reshape(mask_targets, (-1, mask_height, mask_width, num_classes))
-    mask_inside_weights = tf.reshape(mask_inside_weights, (-1, mask_height, mask_width, num_classes))
-  
-    return labels, mask_targets, mask_inside_weights
-
 # def mask_encoder_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, indexs, scope='MaskEncoder'):
   
 #   with tf.name_scope(scope) as sc:
@@ -132,11 +116,11 @@ def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width,
   
 #   return labels, mask_targets, mask_inside_weights, mask_rois, indexs
 
-def mask_encoder_(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, indexs, scope='MaskEncoder'):
+def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, indexs, scope='MaskEncoder'):
   
   with tf.name_scope(scope) as sc:
     labels, mask_targets, mask_inside_weights, mask_rois, indexs = \
-      tf.py_func(mask.encode_,
+      tf.py_func(mask.encode,
                  [gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, indexs],
                  [tf.int32, tf.float32, tf.float32, tf.float32, tf.int32])
 
@@ -239,31 +223,6 @@ def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
             assigned_tensors.append(split_tensors)
 
         return assigned_tensors + [assigned_layers]
-
-# def assign_boxes_(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
-
-#     with tf.name_scope(scope) as sc:
-#         min_k = layers[0]
-#         max_k = layers[-1]
-#         assigned_layers = \
-#             tf.py_func(assign.assign_boxes, 
-#                      [ gt_boxes, min_k, max_k ],
-#                      tf.int32)
-#         assigned_layers = tf.reshape(assigned_layers, [-1])
-
-#         assigned_tensors = []
-#         for t in tensors:
-#             split_tensors = []
-#             for l in layers:
-#                 tf.cast(l, tf.int32)
-#                 inds = tf.where(tf.equal(assigned_layers, l))
-#                 inds = tf.reshape(inds, [-1])
-#                 split_tensors.append(tf.gather(t, inds))
-#             assigned_tensors.append(split_tensors)
-
-#         ordered_cropped_rois = tf.concat([assigned_tensors[0][3],assigned_tensors[0][2],assigned_tensors[0][1],assigned_tensors[0][0]],0)
-
-#         return [ordered_cropped_rois] + assigned_tensors + [assigned_layers]
 
 def inst_inference(final_boxes, classes, cls2_prob, scope='instInference'):
     with tf.name_scope(scope) as sc:
