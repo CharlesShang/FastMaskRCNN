@@ -138,7 +138,7 @@ def test():
             num_classes=81,
             base_anchors=9,
             is_training=False,
-            gt_boxes=gt_boxes, gt_masks=gt_masks, loss_weights=[0.0, 0.0, 0.0, 0.0, 0.0])
+            gt_boxes=None, gt_masks=None, loss_weights=[0.0, 0.0, 0.0, 0.0, 0.0])
 
     input_image = end_points['input']
 

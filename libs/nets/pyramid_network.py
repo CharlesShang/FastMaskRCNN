@@ -603,15 +603,7 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         rpn_batch_pos = tf.cast(tf.add_n(rpn_batch_pos), tf.float32)
         rcnn_batch_pos = tf.cast(tf.add_n(rcnn_batch_pos), tf.float32)
         mask_batch_pos = tf.cast(tf.add_n(mask_batch_pos), tf.float32)
-
-        ### for debuging
-        outputs['tmp_0'] = rpn_cls_losses
-        outputs['tmp_1'] = rpn_cls_losses
-        outputs['tmp_2'] = rpn_cls_losses
-        outputs['tmp_3'] = rpn_cls_losses
-        outputs['tmp_4'] = rpn_cls_losses
-        outputs['tmp_5'] = rpn_cls_losses
-          
+         
         return total_loss, losses, [rpn_batch_pos, rpn_batch, \
                                     rcnn_batch_pos, rcnn_batch, \
                                     mask_batch_pos, mask_batch]
@@ -624,36 +616,44 @@ def build(end_points, image_height, image_width, pyramid_map,
         num_classes,
         base_anchors,
         is_training,
-        gt_boxes,
-        gt_masks, 
+        gt_boxes=None,
+        gt_masks=None, 
         loss_weights=[0.1, 0.1, 1.0, 0.1, 1.0]):
     
     pyramid = build_pyramid(pyramid_map, end_points, is_training=is_training)
 
-    for p in pyramid:
-        print (p)
+    if is_training: 
+      outputs = \
+          build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
+                      is_training=is_training, gt_boxes=gt_boxes)
+      loss, losses, batch_info = build_losses(pyramid, outputs, 
+                      gt_boxes, gt_masks,
+                      num_classes=num_classes, base_anchors=base_anchors,
+                      rpn_box_lw=loss_weights[0], rpn_cls_lw=loss_weights[1],
+                      rcnn_box_lw=loss_weights[2], rcnn_cls_lw=loss_weights[3],
+                      mask_lw=loss_weights[4])
 
-    outputs = \
-        build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
-                    is_training=is_training, gt_boxes=gt_boxes)
-
-    # if is_training: 
-    loss, losses, batch_info = build_losses(pyramid, outputs, 
-                    gt_boxes, gt_masks,
-                    num_classes=num_classes, base_anchors=base_anchors,
-                    rpn_box_lw=loss_weights[0], rpn_cls_lw=loss_weights[1],
-                    rcnn_box_lw=loss_weights[2], rcnn_cls_lw=loss_weights[3],
-                    mask_lw=loss_weights[4])
-
-    outputs['losses'] = losses
-    outputs['total_loss'] = loss
-    outputs['batch_info'] = batch_info
+      outputs['losses'] = losses
+      outputs['total_loss'] = loss
+      outputs['batch_info'] = batch_info
+    else:
+      outputs = \
+          build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
+                      is_training=is_training)
 
     ### just decode outputs into readable prediction
     pred_boxes, pred_classes, pred_masks = decode_output(outputs)
     outputs['pred_boxes'] = pred_boxes
     outputs['pred_classes'] = pred_classes
     outputs['pred_masks'] = pred_masks
+
+    ### for debuging
+    outputs['tmp_0'] = pred_classes
+    outputs['tmp_1'] = pred_classes
+    outputs['tmp_2'] = pred_classes
+    outputs['tmp_3'] = pred_classes
+    outputs['tmp_4'] = pred_classes
+    outputs['tmp_5'] = pred_classes
 
     # ### image and gt visualization
     # visualize_input(gt_boxes, end_points["input"], tf.expand_dims(gt_masks, axis=3))
