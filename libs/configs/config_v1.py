@@ -130,7 +130,7 @@ tf.app.flags.DEFINE_string(
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.001,
+tf.app.flags.DEFINE_float('learning_rate', 0.0001,
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -284,8 +284,8 @@ tf.app.flags.DEFINE_float(
     'NMS threshold in RPN')
 
 tf.app.flags.DEFINE_float(
-    'inst_nms_threshold', 0.3,
-    'NMS threshold in inst inference')
+    'mask_nms_threshold', 0.3,
+    'NMS threshold in mask network during testing')
 
 ##################################
 #            Mask                #

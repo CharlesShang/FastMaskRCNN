@@ -168,12 +168,12 @@ def sample_wrapper(boxes, scores, indexs, is_training=True, only_positive=True, 
   
     return boxes, scores, batch_inds, indexs
 
-def sample_with_gt_wrapper(boxes, scores, gt_boxes, indexs, is_training=True, scope='SampleBoxesWithGT'):
+def sample_with_gt_wrapper(boxes, scores, gt_boxes, indexs, is_training=True, only_positive=True, scope='SampleBoxesWithGT'):
   
   with tf.name_scope(scope) as sc:
     boxes, scores, batch_inds, indexs, mask_boxes, mask_scores, mask_batch_inds, mask_indexs = \
       tf.py_func(sample.sample_rpn_outputs_wrt_gt_boxes,
-                 [boxes, scores, gt_boxes, indexs, is_training],
+                 [boxes, scores, gt_boxes, indexs, is_training, only_positive],
                  [tf.float32, tf.float32, tf.int32, tf.int32, tf.float32, tf.float32, tf.int32, tf.int32])
     boxes = tf.convert_to_tensor(boxes, name='Boxes')
     scores = tf.convert_to_tensor(scores, name='Scores')

@@ -135,7 +135,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
 def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
 
     min_size = cfg.FLAGS.min_size
-    inst_nms_threshold = cfg.FLAGS.inst_nms_threshold
+    mask_nms_threshold = cfg.FLAGS.mask_nms_threshold
     post_nms_inst_n = cfg.FLAGS.post_nms_inst_n
     if class_agnostic is True:
         scores = prob[range(prob.shape[0]),classes]
@@ -172,7 +172,7 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
 
         # filter with nms
         det = np.hstack((boxes, scores)).astype(np.float32)
-        keeps = nms_wrapper.nms(det, inst_nms_threshold)
+        keeps = nms_wrapper.nms(det, mask_nms_threshold)
         
 
         # filter low score
