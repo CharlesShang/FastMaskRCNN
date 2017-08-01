@@ -175,6 +175,75 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
     return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds], indexs[keep_inds],\
            boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds], indexs[mask_fg_inds]
 
+def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
+
+    min_size = cfg.FLAGS.min_size
+    inst_nms_threshold = cfg.FLAGS.inst_nms_threshold
+    post_nms_inst_n = cfg.FLAGS.post_nms_inst_n
+    if class_agnostic is True:
+        scores = prob[range(prob.shape[0]),classes]
+
+        boxes = boxes.reshape((-1, 4))
+        scores = scores.reshape((-1, 1))
+        indexs = indexs.reshape((-1, 1))
+        assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
+
+        # filter background
+        keeps = np.where(classes != 0)[0]
+        scores = scores[keeps]
+        indexs = indexs[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+        print("after filter bg:", len(classes))
+
+        # filter minimum size
+        keeps = _filter_boxes(boxes, min_size=min_size)
+        scores = scores[keeps]
+        indexs = indexs[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+        
+
+        #filter with scores
+        keeps = np.where(scores > 0.5)[0]
+        scores = scores[keeps]
+        indexs = indexs[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+
+        # filter with nms
+        det = np.hstack((boxes, scores)).astype(np.float32)
+        keeps = nms_wrapper.nms(det, inst_nms_threshold)
+        
+
+        # filter low score
+        if post_nms_inst_n > 0:
+            keeps = keeps[:post_nms_inst_n]
+        scores = scores[keeps]
+        indexs = indexs[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+        print("after nms:", len(classes))
+
+        # quick fix for tensorflow error when no bbox presents
+        #@TODO
+        if len(classes) is 0:
+            scores = np.zeros((1, 1))
+            indexs = np.zeros((1, 1))
+            boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
+            classes = np.array([[0]])
+
+    else:
+        raise "inference nms type error"
+    
+    batch_inds = np.zeros([boxes.shape[0]])
+
+    return boxes.astype(np.float32), classes.astype(np.int32), prob.astype(np.float32), batch_inds.astype(np.int32), indexs.astype(np.int32)
+
 def _jitter_boxes(boxes, jitter=0.1):
     """ jitter the boxes before appending them into rois
     """

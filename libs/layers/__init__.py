@@ -14,7 +14,7 @@ from .wrapper import mask_decoder
 from .wrapper import mask_encoder
 from .wrapper import sample_wrapper as sample_rpn_outputs
 from .wrapper import sample_with_gt_wrapper as sample_rpn_outputs_with_gt
+from .wrapper import sample_rcnn_outputs_wrapper as sample_rcnn_outputs
 from .wrapper import gen_all_anchors
 from .wrapper import assign_boxes
 from .crop import crop as ROIAlign
-from .wrapper import inst_inference

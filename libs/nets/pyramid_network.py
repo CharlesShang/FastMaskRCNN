@@ -17,8 +17,8 @@ from libs.layers import gen_all_anchors
 from libs.layers import ROIAlign
 from libs.layers import sample_rpn_outputs
 from libs.layers import sample_rpn_outputs_with_gt
+from libs.layers import sample_rcnn_outputs
 from libs.layers import assign_boxes
-from libs.layers import inst_inference
 from libs.visualization.summary_utils import visualize_bb, visualize_final_predictions, visualize_input
 
 _BN = True
@@ -350,8 +350,8 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           mask_ordered_indexs = tf.concat(values=mask_ordered_indexs, axis=0)
 
         else:
-          ### for testing, maskrcnn takes rcnn boxes as inputs
-          mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs = inst_inference(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
+          ### for testing, mask network takes rcnn boxes as inputs
+          mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
           [mask_assigned_rois, mask_assigned_clses, mask_assigned_scores, mask_assigned_batch_inds, mask_assign_indexs, mask_assigned_layer_inds] =\
                assign_boxes(mask_rois, [mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs], [2, 3, 4, 5])
 

@@ -12,7 +12,6 @@ from . import roi
 from . import mask
 from . import sample
 from . import assign
-from . import inst
 from libs.boxes.anchor import anchors_plane
 
 def anchor_encoder(gt_boxes, all_anchors, height, width, stride, indexs, scope='AnchorEncoder'):
@@ -224,10 +223,10 @@ def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
 
         return assigned_tensors + [assigned_layers]
 
-def inst_inference(final_boxes, classes, cls2_prob, indexs, scope='instInference'):
+def sample_rcnn_outputs_wrapper(final_boxes, classes, cls2_prob, indexs, scope='instInference'):
     with tf.name_scope(scope) as sc:
         inst_boxes, inst_classes, inst_prob, batch_inds, inst_indexs = \
-            tf.py_func(inst.inference,
+            tf.py_func(sample.sample_rcnn_outputs,
                        [final_boxes, classes, cls2_prob, indexs],
                        [tf.float32, tf.int32, tf.float32, tf.int32, tf.int32])
 
