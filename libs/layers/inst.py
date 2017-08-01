@@ -13,7 +13,7 @@ from libs.logs.log import LOG
 
 _DEBUG=False
 
-def inference(boxes, classes, prob, class_agnostic=True):
+def inference(boxes, classes, prob, indexs, class_agnostic=True):
 
     min_size = cfg.FLAGS.min_size
     inst_nms_threshold = cfg.FLAGS.inst_nms_threshold
@@ -23,11 +23,13 @@ def inference(boxes, classes, prob, class_agnostic=True):
 
         boxes = boxes.reshape((-1, 4))
         scores = scores.reshape((-1, 1))
+        indexs = indexs.reshape((-1, 1))
         assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
 
         # filter background
         keeps = np.where(classes != 0)[0]
         scores = scores[keeps]
+        indexs = indexs[keeps]
         boxes = boxes[keeps, :]
         classes = classes[keeps]
         prob = prob[keeps, :]
@@ -36,6 +38,7 @@ def inference(boxes, classes, prob, class_agnostic=True):
         # filter minimum size
         keeps = _filter_boxes(boxes, min_size=min_size)
         scores = scores[keeps]
+        indexs = indexs[keeps]
         boxes = boxes[keeps, :]
         classes = classes[keeps]
         prob = prob[keeps, :]
@@ -44,6 +47,7 @@ def inference(boxes, classes, prob, class_agnostic=True):
         #filter with scores
         keeps = np.where(scores > 0.5)[0]
         scores = scores[keeps]
+        indexs = indexs[keeps]
         boxes = boxes[keeps, :]
         classes = classes[keeps]
         prob = prob[keeps, :]
@@ -57,6 +61,7 @@ def inference(boxes, classes, prob, class_agnostic=True):
         if post_nms_inst_n > 0:
             keeps = keeps[:post_nms_inst_n]
         scores = scores[keeps]
+        indexs = indexs[keeps]
         boxes = boxes[keeps, :]
         classes = classes[keeps]
         prob = prob[keeps, :]
@@ -65,16 +70,17 @@ def inference(boxes, classes, prob, class_agnostic=True):
         # quick fix for tensorflow error when no bbox presents
         #@TODO
         if len(classes) is 0:
-            scores = np.zeros((1,81))
-            boxes = np.array([[0.0,0.0,2.0,2.0]])
+            scores = np.zeros((1, 1))
+            indexs = np.zeros((1, 1))
+            boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
             classes = np.array([[0]])
 
     else:
         raise "inference nms type error"
     
-    batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
+    batch_inds = np.zeros([boxes.shape[0]])
 
-    return boxes.astype(np.float32), classes.astype(np.int32), prob.astype(np.float32), batch_inds
+    return boxes.astype(np.float32), classes.astype(np.int32), prob.astype(np.float32), batch_inds.astype(np.int32), indexs.astype(np.int32)
 
 def _jitter_boxes(boxes, jitter=0.1):
     """ jitter the boxes before appending them into rois

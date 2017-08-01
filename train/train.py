@@ -193,7 +193,6 @@ def train():
             loss_weights=[1.0, 1.0, 1000.0, 10.0, 100.0])
             #loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
 
-
     total_loss = outputs['total_loss']
     losses  = outputs['losses']
     batch_info = outputs['batch_info']
@@ -268,8 +267,7 @@ def train():
                               batch_info + 
                               [input_image] +  [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4] + [tmp_5] +
                               [training_rcnn_clses] + [training_rcnn_clses_target] + [training_mask_rois] + [training_mask_clses_target] + [training_mask_final_mask] + [training_mask_final_mask_target])
-        # final_boxnp, final_clsnp, final_probnp, final_gt_clsnp, final_rpn_boxnp, final_max_overlapsnp, final_masknp, gtnp,
-        #[final_box] + [final_cls] + [final_prob] + [final_gt_cls] + [final_rpn_box] + [final_max_overlaps] + [final_mask] + [gt] +
+
         duration_time = time.time() - start_time
         if step % 1 == 0: 
             print ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """

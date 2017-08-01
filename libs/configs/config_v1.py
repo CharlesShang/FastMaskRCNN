@@ -284,7 +284,7 @@ tf.app.flags.DEFINE_float(
     'NMS threshold in RPN')
 
 tf.app.flags.DEFINE_float(
-    'inst_nms_threshold', 0.5,
+    'inst_nms_threshold', 0.3,
     'NMS threshold in inst inference')
 
 ##################################

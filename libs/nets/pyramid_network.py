@@ -59,9 +59,9 @@ def _extra_conv_arg_scope_with_bn(weight_decay=0.00001,
       activation_fn=tf.nn.relu,
       normalizer_fn=slim.batch_norm,
       normalizer_params=batch_norm_params):
-    with slim.arg_scope([slim.batch_norm], **batch_norm_params):
-      with slim.arg_scope([slim.max_pool2d], padding='SAME') as arg_sc:
-        return arg_sc
+    # with slim.arg_scope([slim.batch_norm], **batch_norm_params):
+    with slim.arg_scope([slim.max_pool2d], padding='SAME') as arg_sc:
+      return arg_sc
 
 def _extra_conv_arg_scope(weight_decay=0.00001, activation_fn=None, normalizer_fn=None):
 
@@ -171,7 +171,8 @@ def build_pyramid(net_name, end_points, bilinear=True, is_training=True):
     pyramid_map = net_name
   # pyramid['inputs'] = end_points['inputs']
   if _BN is True:
-    arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
+    arg_scope = _extra_conv_arg_scope_with_bn()
+    # arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
   #
@@ -214,7 +215,8 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
   """
   outputs = {}
   if _BN is True:
-    arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
+    arg_scope = _extra_conv_arg_scope_with_bn()
+    # arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
 
@@ -269,10 +271,8 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs, mask_rois, mask_scores, mask_batch_inds, mask_indexs = \
                 sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training)
         else:
-          ### for testing, rcnn takes rpn boxes as inputs. maskrcnn takes rcnn boxes as inputs
-          ### @TODO Fix testing by is_training=False. Something wrong with "network.get_network(FLAGS.network, image, weight_decay=FLAGS.weight_decay, is_training=False)"
-          pass
-          # rcnn_rois, rcnn_scores, rcnn_batch_inds = sample_rpn_outputs(rois, rpn_probs[:, 1])
+          ### for testing, only rcnn takes rpn boxes as inputs. maskrcnn takes rcnn boxes as inputs
+          rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs)
 
         ### assign pyramid layer indexs to rcnn network's ROIs
         [rcnn_assigned_rois, rcnn_assigned_batch_inds, rcnn_assigned_indexs, rcnn_assigned_layer_inds] = \
@@ -332,7 +332,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
 
           mask_cropped_features = []
           mask_ordered_rois = []
-          mask_ordered_index = []
+          mask_ordered_indexs = []
           ### crop features from pyramid for mask network
           for i in range(5, 1, -1):
               p = 'P%d'%i
@@ -343,17 +343,47 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
                                  pooled_height=14, pooled_width=14)
               mask_cropped_features.append(mask_cropped_feature)
               mask_ordered_rois.append(mask_splitted_roi)
-              mask_ordered_index.append(mask_index)
+              mask_ordered_indexs.append(mask_index)
               
           mask_cropped_features = tf.concat(values=mask_cropped_features, axis=0)
           mask_ordered_rois = tf.concat(values=mask_ordered_rois, axis=0)
-          mask_ordered_index = tf.concat(values=mask_ordered_index, axis=0)
+          mask_ordered_indexs = tf.concat(values=mask_ordered_indexs, axis=0)
 
         else:
-        ### for testing, maskrcnn takes rcnn boxes as inputs
-        ### @TODO Fix testing by is_training=False. Something wrong with "network.get_network(FLAGS.network, image, weight_decay=FLAGS.weight_decay, is_training=False)"
-          pass
-          
+          ### for testing, maskrcnn takes rcnn boxes as inputs
+          mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs = inst_inference(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
+          [mask_assigned_rois, mask_assigned_clses, mask_assigned_scores, mask_assigned_batch_inds, mask_assign_indexs, mask_assigned_layer_inds] =\
+               assign_boxes(mask_rois, [mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs], [2, 3, 4, 5])
+
+          mask_cropped_features = []
+          mask_ordered_rois = []
+          mask_ordered_indexs = []
+          mask_ordered_clses = []
+          mask_ordered_scores = []
+          for i in range(5, 1, -1):
+            p = 'P%d'%i
+            mask_splitted_roi = mask_assigned_rois[i-2]
+            mask_splitted_cls = mask_assigned_clses[i-2]
+            mask_splitted_score = mask_assigned_scores[i-2]
+            mask_batch_ind = mask_assigned_batch_inds[i-2]
+            mask_index = mask_assign_indexs[i-2]
+            mask_cropped_feature, mask_rois_to_crop_and_resize, mask_py_shape, mask_ihiw = ROIAlign(pyramid[p], mask_splitted_roi, mask_batch_ind, ih, iw, stride=2**i,
+                               pooled_height=14, pooled_width=14)
+            mask_cropped_features.append(mask_cropped_feature)
+            mask_ordered_rois.append(mask_splitted_roi)
+            mask_ordered_indexs.append(mask_index)
+            mask_ordered_clses.append(mask_splitted_cls)
+            mask_ordered_scores.append(mask_splitted_score)
+
+          mask_cropped_features = tf.concat(values=mask_cropped_features, axis=0)
+          mask_ordered_rois = tf.concat(values=mask_ordered_rois, axis=0)
+          mask_ordered_indexs = tf.concat(values=mask_ordered_indexs, axis=0)
+          mask_ordered_clses = tf.concat(values=mask_ordered_clses, axis=0)
+          mask_ordered_scores = tf.concat(values=mask_ordered_scores, axis=0)
+
+          outputs['mask_final_clses'] = mask_ordered_clses
+          outputs['mask_final_scores'] = mask_ordered_scores
+
         ### mask head
         m = mask_cropped_features
         for _ in range(4):
@@ -364,11 +394,10 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         m = slim.conv2d(m, num_classes, [1, 1], stride=1, padding='VALID', activation_fn=None, normalizer_fn=None)
 
         outputs['mask_ordered_rois'] = mask_ordered_rois
-        outputs['mask_ordered_index'] = mask_ordered_index
+        outputs['mask_ordered_indexs'] = mask_ordered_indexs
         outputs['mask_cropped_features'] = mask_cropped_features 
         outputs['mask_mask'] = m
         outputs['mask_final_mask'] = tf.nn.sigmoid(m)
-        ### @TODO add a mask, given the predicted boxes and classes
           
         return outputs
 
@@ -405,7 +434,8 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
   mask_batch_pos = []
 
   if _BN is True:
-    arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
+    arg_scope = _extra_conv_arg_scope_with_bn()
+    # arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
   with slim.arg_scope(arg_scope):
@@ -522,19 +552,19 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         ### mask loss
         # mask of shape (N, h, w, num_classes)
         mask_ordered_rois = outputs['mask_ordered_rois']
-        mask_ordered_index = outputs['mask_ordered_index'] 
+        mask_ordered_indexs = outputs['mask_ordered_indexs'] 
         masks = outputs['mask_mask']
 
-        mask_clses_target, mask_targets, mask_inside_weights, mask_rois, mask_ordered_index= \
-          mask_encoder(gt_masks, gt_boxes, mask_ordered_rois, num_classes, 28, 28, mask_ordered_index,scope='MaskEncoder')
+        mask_clses_target, mask_targets, mask_inside_weights, mask_rois, mask_ordered_indexs= \
+          mask_encoder(gt_masks, gt_boxes, mask_ordered_rois, num_classes, 28, 28, mask_ordered_indexs,scope='MaskEncoder')
 
-        mask_clses_target, mask_targets, mask_inside_weights, mask_rois, mask_ordered_index, masks = \
+        mask_clses_target, mask_targets, mask_inside_weights, mask_rois, mask_ordered_indexs, masks = \
                 _filter_negative_samples(tf.reshape(mask_clses_target, [-1]), [
                     tf.reshape(mask_clses_target, [-1]),
                     tf.reshape(mask_targets, [-1, 28, 28, num_classes]),
                     tf.reshape(mask_inside_weights, [-1, 28, 28, num_classes]),
                     tf.reshape(mask_rois, [-1, 4]),
-                    tf.reshape(mask_ordered_index, [-1]),
+                    tf.reshape(mask_ordered_indexs, [-1]),
                     tf.reshape(masks, [-1, 28, 28, num_classes]),
                     ])
 
@@ -547,7 +577,8 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
                     tf.greater_equal(mask_clses_target, 1), tf.float32
                     )))
         ### NOTE: w/o competition between classes. 
-        mask_loss = mask_lw * tf.nn.sigmoid_cross_entropy_with_logits(labels=mask_targets, logits=masks) 
+        mask_loss = mask_inside_weights * tf.nn.sigmoid_cross_entropy_with_logits(labels=mask_targets, logits=masks) 
+        mask_loss = mask_lw * mask_loss
         mask_loss = tf.reduce_mean(mask_loss) 
         mask_loss = tf.cond(tf.greater(tf.size(mask_clses_target), 0), lambda: mask_loss, lambda: tf.constant(0.0))
         tf.add_to_collection(tf.GraphKeys.LOSSES, mask_loss)
@@ -606,31 +637,31 @@ def build(end_points, image_height, image_width, pyramid_map,
         build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
                     is_training=is_training, gt_boxes=gt_boxes)
 
-    if is_training:
-        loss, losses, batch_info = build_losses(pyramid, outputs, 
-                        gt_boxes, gt_masks,
-                        num_classes=num_classes, base_anchors=base_anchors,
-                        rpn_box_lw=loss_weights[0], rpn_cls_lw=loss_weights[1],
-                        rcnn_box_lw=loss_weights[2], rcnn_cls_lw=loss_weights[3],
-                        mask_lw=loss_weights[4])
+    # if is_training: 
+    loss, losses, batch_info = build_losses(pyramid, outputs, 
+                    gt_boxes, gt_masks,
+                    num_classes=num_classes, base_anchors=base_anchors,
+                    rpn_box_lw=loss_weights[0], rpn_cls_lw=loss_weights[1],
+                    rcnn_box_lw=loss_weights[2], rcnn_cls_lw=loss_weights[3],
+                    mask_lw=loss_weights[4])
 
-        outputs['losses'] = losses
-        outputs['total_loss'] = loss
-        outputs['batch_info'] = batch_info
+    outputs['losses'] = losses
+    outputs['total_loss'] = loss
+    outputs['batch_info'] = batch_info
 
-    ## just decode outputs into readable prediction
+    ### just decode outputs into readable prediction
     pred_boxes, pred_classes, pred_masks = decode_output(outputs)
     outputs['pred_boxes'] = pred_boxes
     outputs['pred_classes'] = pred_classes
     outputs['pred_masks'] = pred_masks
 
-    # image and gt visualization
-    visualize_input(gt_boxes, end_points["input"], tf.expand_dims(gt_masks, axis=3))
+    # ### image and gt visualization
+    # visualize_input(gt_boxes, end_points["input"], tf.expand_dims(gt_masks, axis=3))
 
-    # rpn visualization
-    visualize_bb(end_points["input"], outputs['rpn_final_boxes'], name="rpn_bb_visualization")
+    # ### rpn visualization
+    # visualize_bb(end_points["input"], outputs['rpn_final_boxes'], name="rpn_bb_visualization")
 
-    # mask network visualization
+    # ### mask network visualization
     # first_mask = outputs['training_mask_final_mask'][:1]
     # first_mask = tf.transpose(first_mask, [3, 1, 2, 0])
 

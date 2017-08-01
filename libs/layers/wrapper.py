@@ -224,16 +224,17 @@ def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
 
         return assigned_tensors + [assigned_layers]
 
-def inst_inference(final_boxes, classes, cls2_prob, scope='instInference'):
+def inst_inference(final_boxes, classes, cls2_prob, indexs, scope='instInference'):
     with tf.name_scope(scope) as sc:
-        inst_boxes, inst_classes, inst_prob, batch_inds = \
+        inst_boxes, inst_classes, inst_prob, batch_inds, inst_indexs = \
             tf.py_func(inst.inference,
-                       [final_boxes, classes, cls2_prob],
-                       [tf.float32, tf.int32, tf.float32, tf.int32])
+                       [final_boxes, classes, cls2_prob, indexs],
+                       [tf.float32, tf.int32, tf.float32, tf.int32, tf.int32])
 
         inst_boxes = tf.convert_to_tensor(inst_boxes, name='instBoxes')
         inst_classes = tf.convert_to_tensor(inst_classes, name='instClasses')
         inst_prob = tf.convert_to_tensor(inst_prob, name='instProb')
         batch_inds = tf.convert_to_tensor(batch_inds, name='BatchInds')
+        inst_indexs = tf.convert_to_tensor(inst_indexs, name='inst_indexs')
 
-        return [inst_boxes] + [inst_classes] + [inst_prob] + [batch_inds]
+        return [inst_boxes] + [inst_classes] + [inst_prob] + [batch_inds] + [inst_indexs]
