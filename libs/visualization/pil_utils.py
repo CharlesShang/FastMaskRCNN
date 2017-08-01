@@ -51,7 +51,7 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
                             box = np.floor(box).astype('uint16')
                             bbox_w = box[2]-box[0]
                             bbox_h = box[3]-box[1]
-                            mask_color_id = np.random.randint(15)
+                            mask_color_id = np.random.randint(35)
                             color_img = color_id_to_color_code(mask_color_id)* np.ones((bbox_h,bbox_w,1)) * 255
                             color_img = Image.fromarray(color_img.astype('uint8')).convert('RGBA')
                             #color_img = Image.new("RGBA", (bbox_w,bbox_h), np.random.rand(1,3) * 255 )
@@ -109,5 +109,27 @@ def color_id_to_color_code(colorId):
                            [0, 169, 252],
                            [104, 30, 126],
                            [125, 60, 181],
-                           [189, 122, 246]])
+                           [189, 122, 246],
+                           [234, 62, 112],
+                           [198, 44, 58],
+                           [243, 114, 82],
+                           [255, 130, 1],
+                           [255, 211, 92],
+                           [138, 151, 71],
+                           [2, 181, 160],
+                           [75, 196, 213],
+                           [149, 69, 103],
+                           [125, 9, 150],
+                           [169, 27, 176],
+                           [198, 30, 153],
+                           [207, 0, 99],
+                           [230, 21, 119],
+                           [243, 77, 154],
+                           [144, 33, 71],
+                           [223, 40, 35],
+                           [247, 106, 4],
+                           [206, 156, 72],
+                           [250, 194, 0],
+                           [254, 221, 39],
+                           ])
     return color_code[colorId]

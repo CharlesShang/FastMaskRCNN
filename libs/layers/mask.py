@@ -9,7 +9,6 @@ import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.logs.log import LOG
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
-import tensorflow as tf
 
 _DEBUG = False 
 

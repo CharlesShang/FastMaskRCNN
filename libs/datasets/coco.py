@@ -95,7 +95,7 @@ def read(tfrecords_filename):
   if not isinstance(tfrecords_filename, list):
     tfrecords_filename = [tfrecords_filename]
   filename_queue = tf.train.string_input_producer(
-    tfrecords_filename, num_epochs=1)#100
+    tfrecords_filename, num_epochs=100)
 
   options = tf.python_io.TFRecordOptions(TFRecordCompressionType.ZLIB)
   reader = tf.TFRecordReader(options=options)

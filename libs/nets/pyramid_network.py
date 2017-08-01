@@ -269,10 +269,10 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         if is_training is True:
           ### for training, rcnn and maskrcnn take rpn boxes as inputs
           rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs, mask_rois, mask_scores, mask_batch_inds, mask_indexs = \
-                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training)
+                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
         else:
           ### for testing, only rcnn takes rpn boxes as inputs. maskrcnn takes rcnn boxes as inputs
-          rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs)
+          rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs, only_positive=True)
 
         ### assign pyramid layer indexs to rcnn network's ROIs
         [rcnn_assigned_rois, rcnn_assigned_batch_inds, rcnn_assigned_indexs, rcnn_assigned_layer_inds] = \

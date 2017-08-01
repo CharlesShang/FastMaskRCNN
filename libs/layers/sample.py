@@ -35,14 +35,10 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   boxes = boxes.reshape((-1, 4))
   scores = scores.reshape((-1, 1))
   assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
-  
-  # print ("boxes : ")
-  # print (scores.size)
 
   # filter backgrounds
   # Hope this will filter most of background anchors, since a argsort is too slow..
-  #if only_positive:
-  if True:
+  if only_positive:
     keeps = np.where(scores > 0.5)[0]
     boxes = boxes[keeps, :]
     scores = scores[keeps]
@@ -53,9 +49,6 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   boxes = boxes[keeps, :]
   scores = scores[keeps]
   indexs = indexs[keeps]
-
-  # print ("after_size : ")
-  # print (scores.size)
   
   # filter with scores
   order = scores.ravel().argsort()[::-1]
@@ -65,16 +58,9 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   scores = scores[order]
   indexs = indexs[order]
 
-  # print ("after_pre_nms_score : ")
-  # print (scores.size)
-  # print (np.amin(scores))
-
   # filter with nms
   det = np.hstack((boxes, scores)).astype(np.float32)
   keeps = nms_wrapper.nms(det, rpn_nms_threshold)
-
-  # print ("after_nms : ")
-  # print (len(keeps))
   
   if post_nms_top_n > 0:
     keeps = keeps[:post_nms_top_n]
@@ -82,9 +68,6 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   scores = scores[keeps].astype(np.float32)
   indexs = indexs[keeps]
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
-
-  # print ("after_post_nms_score : ")
-  # print (scores.size)
 
   # # random sample boxes
   ## try early sample later
@@ -112,39 +95,15 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
         gt_assignment = overlaps.argmax(axis=1) # B
         max_overlaps = overlaps[np.arange(boxes.shape[0]), gt_assignment] # B
         fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
-        # print("after_compair with gt")
-        # print(fg_inds.size)
 
         if True:
             gt_argmax_overlaps = overlaps.argmax(axis=0) # G
             fg_inds = np.union1d(gt_argmax_overlaps, fg_inds)
 
-        # print("after_force with gt")
-        # print(fg_inds.size)
-        # if _DEBUG and np.argmax(overlaps[fg_inds],axis=1).size < gt_boxes.size/5.0:
-        #     print("gt_size")
-        #     print(gt_boxes)
-        #     gt_height = (gt_boxes[:,2]-gt_boxes[:,0])
-        #     gt_width = (gt_boxes[:,3]-gt_boxes[:,1])
-        #     gt_dim = np.vstack((gt_height, gt_width))
-        #     print(np.transpose(gt_dim))
-        #     #print(gt_height)
-        #     #print(gt_width)
-
-        #     print('SAMPLE: %d after overlaps by %s' % (len(fg_inds),cfg.FLAGS.fg_threshold))
-        #     print("detected object no.")
-        #     print(np.argmax(overlaps[fg_inds],axis=1))
-        #     print("total object")
-        #     print(gt_boxes.size/5.0)
-
         mask_fg_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
-        # print("after_compair with mask_gt")
-        # print(mask_fg_inds.size)
 
         if mask_fg_inds.size > cfg.FLAGS.masks_per_image:
             mask_fg_inds = np.random.choice(mask_fg_inds, size=cfg.FLAGS.masks_per_image, replace=False)
-        # print("after_mask_per_img")
-        # print(mask_fg_inds.size)
         
         fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
         if fg_inds.size > 0 and fg_rois < fg_inds.size:
@@ -157,8 +116,6 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
         keep_inds = np.append(fg_inds, bg_inds)
-        #print(gt_boxes[np.argmax(overlaps[fg_inds],axis=1),4])
-        print(mask_fg_inds.size)
         if mask_fg_inds.size is 0:
             mask_fg_inds = keep_inds
     else:
@@ -195,7 +152,6 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
         boxes = boxes[keeps, :]
         classes = classes[keeps]
         prob = prob[keeps, :]
-        print("after filter bg:", len(classes))
 
         # filter minimum size
         keeps = _filter_boxes(boxes, min_size=min_size)
@@ -227,7 +183,6 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
         boxes = boxes[keeps, :]
         classes = classes[keeps]
         prob = prob[keeps, :]
-        print("after nms:", len(classes))
 
         # quick fix for tensorflow error when no bbox presents
         #@TODO
