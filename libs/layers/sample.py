@@ -193,6 +193,7 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
             classes = np.array([[0]])
 
     else:
+        #@TODO
         raise "inference nms type error"
     
     batch_inds = np.zeros([boxes.shape[0]])
