@@ -268,15 +268,17 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
 
         if is_training is True:
           ### for training, rcnn and maskrcnn take rpn boxes as inputs
-          rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs, mask_rois, mask_scores, mask_batch_inds, mask_indexs = \
+          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn, rpn_rois_to_mask, rpn_scores_to_mask, rpn_batch_inds_to_mask, rpn_indexs_to_mask = \
                 sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
+          # rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs, mask_rois, mask_scores, mask_batch_inds, mask_indexs = \
+          #       sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
         else:
           ### for testing, only rcnn takes rpn boxes as inputs. maskrcnn takes rcnn boxes as inputs
-          rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs, only_positive=True)
+          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs, only_positive=True)
 
         ### assign pyramid layer indexs to rcnn network's ROIs
         [rcnn_assigned_rois, rcnn_assigned_batch_inds, rcnn_assigned_indexs, rcnn_assigned_layer_inds] = \
-                assign_boxes(rcnn_rois, [rcnn_rois, rcnn_batch_inds, rcnn_indexs], [2, 3, 4, 5])
+                assign_boxes(rpn_rois_to_rcnn, [rpn_rois_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn], [2, 3, 4, 5])
 
         ### crop features from pyramid for rcnn network
         rcnn_cropped_features = []
@@ -328,7 +330,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         ### assign pyramid layer indexs to mask network's ROIs
         if is_training:
           [mask_assigned_rois, mask_assigned_batch_inds, mask_assigned_indexs, mask_assigned_layer_inds] = \
-               assign_boxes(mask_rois, [mask_rois, mask_batch_inds, mask_indexs], [2, 3, 4, 5])
+               assign_boxes(rpn_rois_to_mask, [rpn_rois_to_mask, rpn_batch_inds_to_mask, rpn_indexs_to_mask], [2, 3, 4, 5])
 
           mask_cropped_features = []
           mask_ordered_rois = []
@@ -351,9 +353,10 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
 
         else:
           ### for testing, mask network takes rcnn boxes as inputs
-          mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
+          rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask, rcnn_indexs_to_mask = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
+          # mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
           [mask_assigned_rois, mask_assigned_clses, mask_assigned_scores, mask_assigned_batch_inds, mask_assign_indexs, mask_assigned_layer_inds] =\
-               assign_boxes(mask_rois, [mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs], [2, 3, 4, 5])
+               assign_boxes(rcnn_rois_to_mask, [rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask, rcnn_indexs_to_mask], [2, 3, 4, 5])
 
           mask_cropped_features = []
           mask_ordered_rois = []
