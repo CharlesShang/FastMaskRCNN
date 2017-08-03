@@ -28,9 +28,9 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
 
   # training: 12000, 2000
   # testing: 6000, 400
-  if not is_training:
-    pre_nms_top_n = int(pre_nms_top_n / 2)
-    post_nms_top_n = int(post_nms_top_n / 5)
+  # if not is_training:
+  #   pre_nms_top_n = int(pre_nms_top_n / 2)
+  #   post_nms_top_n = int(post_nms_top_n / 5)
     
   boxes = boxes.reshape((-1, 4))
   scores = scores.reshape((-1, 1))
@@ -161,7 +161,6 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
         classes = classes[keeps]
         prob = prob[keeps, :]
         
-
         #filter with scores
         keeps = np.where(scores > 0.5)[0]
         scores = scores[keeps]
@@ -171,6 +170,13 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
         prob = prob[keeps, :]
 
         # filter with nms
+        order = scores.ravel().argsort()[::-1]
+        scores = scores[order]
+        indexs = indexs[order]
+        boxes = boxes[order, :]
+        classes = classes[order]
+        prob = prob[order, :]
+
         det = np.hstack((boxes, scores)).astype(np.float32)
         keeps = nms_wrapper.nms(det, mask_nms_threshold)
         
@@ -191,6 +197,7 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
             indexs = np.zeros((1, 1))
             boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
             classes = np.array([[0]])
+            prob = np.zeros((1,81))
 
     else:
         #@TODO
