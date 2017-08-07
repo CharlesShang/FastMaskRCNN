@@ -256,7 +256,7 @@ tf.app.flags.DEFINE_float(
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
-    'rpn_batch_size', 500,
+    'rpn_batch_size', 512,
     'Number of rpn anchors that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
