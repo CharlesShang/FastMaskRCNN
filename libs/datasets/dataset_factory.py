@@ -16,7 +16,8 @@ def get_dataset(dataset_name, split_name, dataset_dir,
         file_pattern = dataset_name + '_' + split_name + '*.tfrecord' 
 
     tfrecords = glob.glob(dataset_dir + '/records/' + file_pattern)
-    image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = coco.read(tfrecords)
+    print(tfrecords)
+    image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = coco.read(tfrecords, is_training=is_training)
 
     image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training)
     #visualize_input(gt_boxes, image, tf.expand_dims(gt_masks, axis=3))

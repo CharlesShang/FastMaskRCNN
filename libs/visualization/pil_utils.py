@@ -11,7 +11,7 @@ def draw_img(step, image, name='', image_height=1, image_width=1, rois=None):
     img = Image.fromarray(img)
     return img.save(FLAGS.train_dir + 'test_' + name + '_' +  str(step) +'.jpg', 'JPEG')
 
-def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, label=None, gt_label=None, mask=None, prob=None, iou=None, vis_th=0.7, vis_all=False, ignore_bg=True):
+def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, label=None, gt_label=None, mask=None, prob=None, iou=None, vis_th=0.5, vis_all=False, ignore_bg=True):
     source_img = Image.fromarray(image)
     b, g, r = source_img.split()
     source_img = Image.merge("RGB", (r, g, b))

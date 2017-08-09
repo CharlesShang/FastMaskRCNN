@@ -269,7 +269,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         if is_training is True:
           ### for training, rcnn and maskrcnn take rpn boxes as inputs
           rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn, rpn_rois_to_mask, rpn_scores_to_mask, rpn_batch_inds_to_mask, rpn_indexs_to_mask = \
-                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
+                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=False)
           # rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs, mask_rois, mask_scores, mask_batch_inds, mask_indexs = \
           #       sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
         else:
@@ -303,14 +303,14 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         # to 7 x 7
         rcnn = slim.max_pool2d(rcnn_cropped_features, [3, 3], stride=2, padding='SAME')
         rcnn = slim.flatten(rcnn)
-        rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu)
+        rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)
-        rcnn = slim.fully_connected(rcnn,  1024, activation_fn=tf.nn.relu)
+        rcnn = slim.fully_connected(rcnn,  1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)
         rcnn_clses = slim.fully_connected(rcnn, num_classes, activation_fn=None, normalizer_fn=None, 
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.05))
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         rcnn_boxes = slim.fully_connected(rcnn, num_classes*4, activation_fn=None, normalizer_fn=None, 
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.05))
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         rcnn_scores = tf.nn.softmax(rcnn_clses)
 
         ### decode rcnn network final outputs

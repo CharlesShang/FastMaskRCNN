@@ -190,9 +190,10 @@ def train():
             base_anchors=15,#9
             is_training=True,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
-            loss_weights=[10.0, 10.0, 1000.0, 1.0, 100.0])
+            loss_weights=[10.0, 1.0, 1000.0, 1.0, 100.0])
             # loss_weights=[100.0, 100.0, 1000.0, 10.0, 100.0])
             # loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
+            # loss_weights=[0.1, 0.01, 10.0, 0.1, 1.0])
 
     total_loss = outputs['total_loss']
     losses  = outputs['losses']

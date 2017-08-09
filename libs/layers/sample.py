@@ -13,7 +13,7 @@ from libs.logs.log import LOG
 
 _DEBUG=False
 
-def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=False):
+def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=False, with_nms=False):
   """Sample boxes according to scores and some learning strategies
   assuming the first class is background
   Params:
@@ -50,7 +50,8 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   scores = scores[keeps]
   indexs = indexs[keeps]
   
-  # filter with scores
+
+  # filter with nms
   order = scores.ravel().argsort()[::-1]
   if pre_nms_top_n > 0:
     order = order[:pre_nms_top_n]
@@ -58,15 +59,16 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   scores = scores[order]
   indexs = indexs[order]
 
-  # filter with nms
-  det = np.hstack((boxes, scores)).astype(np.float32)
-  keeps = nms_wrapper.nms(det, rpn_nms_threshold)
-  
+  if with_nms is True:
+    det = np.hstack((boxes, scores)).astype(np.float32)
+    keeps = nms_wrapper.nms(det, rpn_nms_threshold)
+
   if post_nms_top_n > 0:
     keeps = keeps[:post_nms_top_n]
   boxes = boxes[keeps, :]
   scores = scores[keeps].astype(np.float32)
   indexs = indexs[keeps]
+
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 
   # # random sample boxes
@@ -86,7 +88,7 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
 
 def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training=False, only_positive=False):
     """sample boxes for refined output"""
-    boxes, scores, batch_inds, indexs = sample_rpn_outputs(boxes, scores, indexs, is_training, only_positive)
+    boxes, scores, batch_inds, indexs = sample_rpn_outputs(boxes, scores, indexs, is_training=is_training, only_positive=only_positive, with_nms=True)
 
     if gt_boxes.size > 0:
         overlaps = cython_bbox.bbox_overlaps(
@@ -111,7 +113,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
         
         # TODO: sampling strategy
         bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-        bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 128)#64
+        bg_rois = int(max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3),  cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))#128
         if bg_inds.size > 0 and bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
@@ -120,7 +122,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
             mask_fg_inds = keep_inds
     else:
         bg_inds = np.arange(boxes.shape[0])
-        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 128)#64
+        bg_rois = int(min(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction),  cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))#128
         if bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
