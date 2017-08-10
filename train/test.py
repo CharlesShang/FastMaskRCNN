@@ -84,10 +84,12 @@ def restore(sess):
             raise
 
 def evaluate(ap_threshold, gt_boxes, gt_masks, boxes, classes, probs, masks):
-    num_instances = gt_boxes.shape[0]
+    gt_clses = gt_boxes[:, 4]
     num_prediction = boxes.shape[0]
-    recall = []
-    precision = []
+    num_instances = gt_boxes.shape[0]
+    precision = np.zeros_like(ap_threshold)
+    recall = np.zeros_like(ap_threshold)
+
     if num_instances is not 0 and num_prediction is not 0:
         m = np.array(masks)
         m = np.transpose(m,(0,3,1,2))
@@ -96,17 +98,27 @@ def evaluate(ap_threshold, gt_boxes, gt_masks, boxes, classes, probs, masks):
         np.ascontiguousarray(boxes[:, 0:4], dtype=np.float),
         np.ascontiguousarray(gt_boxes[:, 0:4], dtype=np.float))
     
-
-        overlaps_recall = np.max(overlaps, axis=0)
         overlaps_precision = np.max(overlaps, axis=1)
+        overlaps_precision_indexs = np.argmax(overlaps, axis=1)
+        overlaps_recall = np.max(overlaps, axis=0)
+        overlaps_recall_indexs = np.argmax(overlaps, axis=0)
+
         for i, threshold in enumerate(ap_threshold):
-            recall.append(np.sum(overlaps_recall > threshold))
-            precision.append(np.sum(overlaps_precision > threshold))
-    else:
-        for i, threshold in enumerate(ap_threshold):
-            recall.append(0)
-            precision.append(0)
-    return np.array(recall), np.array(precision), num_instances, num_prediction
+            #precision
+            iou_bool = overlaps_precision > threshold
+            cls_bool = gt_clses[overlaps_precision_indexs] == classes
+            #mask_bool = True ##TODO
+            precision[i] = np.sum(iou_bool * cls_bool )
+
+            #recall
+            iou_bool = overlaps_recall > threshold
+            cls_bool = gt_clses == classes[overlaps_recall_indexs]
+            #mask_bool = True ##TODO
+            recall[i] = np.sum(iou_bool * cls_bool )
+            # print(iou_bool)
+            # print(cls_bool)
+            
+    return recall, precision, num_instances, num_prediction
     
                 
 def test():
@@ -128,7 +140,7 @@ def test():
             weight_decay=FLAGS.weight_decay, is_training=False)
     outputs = pyramid_network.build(end_points, im_shape[1], im_shape[2], pyramid_map,
             num_classes=81,
-            base_anchors=15,
+            base_anchors=9,#15
             is_training=False,
             gt_boxes=None, gt_masks=None, loss_weights=[0.0, 0.0, 0.0, 0.0, 0.0])
 
@@ -190,7 +202,7 @@ def test():
 
 
     # for step in range(FLAGS.max_iters):
-    for step in range(2500):
+    for step in range(40503):
         
         start_time = time.time()
 
@@ -233,9 +245,13 @@ def test():
         total_precision += precision
         total_instance += num_instances
         total_prediction += num_prediction
+        print("recall       = {}".format(total_recall / float(total_instance)))
+        print("precision    = {}".format(total_precision / float(total_prediction)))
+        print("------------------------------------------------")
 
         # print("recall       = {}".format([x / float(total_instance) for x in total_recall]))
         # print("precision    = {}".format([x / float(total_prediction) for x in total_precision]))
+    print("===============================================")
     print("recall       = {}".format(total_recall / float(total_instance)))
     print("precision    = {}".format(total_precision / float(total_prediction)))
 

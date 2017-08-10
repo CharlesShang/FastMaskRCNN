@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-_IS_TRAINING = True
+_IS_TRAINING = False
 
 ##########################
 #                  restore
