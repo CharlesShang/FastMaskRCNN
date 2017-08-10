@@ -49,14 +49,17 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   scores = scores[keeps]
   indexs = indexs[keeps]
 
-  ## sort and filter before nms
-  if len(scores) <= pre_nms_top_n: ##full sort
-    order = scores.ravel().argsort()[::-1]
-    if pre_nms_top_n > 0:
-      order = order[:pre_nms_top_n]
-  else: ## partial + full sort
-    order = scores.ravel()
-    order = np.argsort((order[np.argpartition(-order, pre_nms_top_n)])[0:pre_nms_top_n:])[::-1]
+  ## filter before nms
+  if len(scores) > pre_nms_top_n:
+    partial_order = scores.ravel()
+    partial_order = np.argpartition(-partial_order, pre_nms_top_n)[:pre_nms_top_n]
+
+    boxes = boxes[partial_order, :]
+    scores = scores[partial_order]
+    indexs = indexs[partial_order]
+
+  ## sort
+  order = scores.ravel().argsort()[::-1]
   boxes = boxes[order, :]
   scores = scores[order]
   indexs = indexs[order]
