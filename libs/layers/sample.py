@@ -49,20 +49,28 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   scores = scores[keeps]
   indexs = indexs[keeps]
 
-  ## filter before nms
-  if len(scores) > pre_nms_top_n:
-    partial_order = scores.ravel()
-    partial_order = np.argpartition(-partial_order, pre_nms_top_n)[:pre_nms_top_n]
+  # scores_ = scores
 
-    boxes = boxes[partial_order, :]
-    scores = scores[partial_order]
-    indexs = indexs[partial_order]
+  ## filter before nms
+  # if len(scores) > pre_nms_top_n:
+  #   partial_order = scores.ravel()
+  #   partial_order = np.argpartition(-partial_order, pre_nms_top_n)[:pre_nms_top_n]
+
+  #   boxes = boxes[partial_order, :]
+  #   scores = scores[partial_order]
+  #   indexs = indexs[partial_order]
 
   ## sort
   order = scores.ravel().argsort()[::-1]
+  if len(order) > pre_nms_top_n:
+    order = order[:pre_nms_top_n]
   boxes = boxes[order, :]
   scores = scores[order]
   indexs = indexs[order]
+  
+  # if len(scores_) > pre_nms_top_n:
+  #   scores_ = scores_[scores_.ravel().argsort()[::-1][:pre_nms_top_n]]
+  #   print(np.array_equal(scores_, scores))
 
   ## filter by nms
   if with_nms is True:
@@ -72,6 +80,15 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   ## filter after nms
   if post_nms_top_n > 0:
     keeps = keeps[:post_nms_top_n]
+
+  # if np.any(keeps > len(scores)):
+  #   print ("ERROR: keep index exceeds array range: {}".format(keeps[keeps > len(scores)]))
+  #   print (keeps.shape)
+  #   print (boxes.shape)
+  #   print (scores.shape)
+  #   print (indexs.shape)
+  #   keeps[keeps > len(scores)] = len(scores)-1
+
   boxes = boxes[keeps, :]
   scores = scores[keeps].astype(np.float32)
   indexs = indexs[keeps]
@@ -264,9 +281,10 @@ def _apply_nms(boxes, scores, threshold = 0.5):
 if __name__ == '__main__':
   import time
   t = time.time()
-  
-  for i in range(10):
-    N = 700000
+
+  for i in range(100):
+    
+    N = 120000
     boxes = np.random.randint(0, 50, (N, 2))
     s = np.random.randint(10, 40, (N, 2))
     s = boxes + s

@@ -127,7 +127,7 @@ def test():
     ## data
     image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = \
         datasets.get_dataset(FLAGS.dataset_name, 
-                             FLAGS.dataset_split_name, 
+                             FLAGS.dataset_split_name_test, 
                              FLAGS.dataset_dir, 
                              FLAGS.im_batch,
                              is_training=False)

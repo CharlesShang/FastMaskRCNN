@@ -4,8 +4,6 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-_IS_TRAINING = False
-
 ##########################
 #                  restore
 ##########################
@@ -41,7 +39,11 @@ tf.app.flags.DEFINE_string(
 
 tf.app.flags.DEFINE_string(
     'dataset_split_name', 'train2014',
-    'The name of the train/test/val split.')
+    'The name of the train split.')
+
+tf.app.flags.DEFINE_string(
+    'dataset_split_name_test', 'val2014',
+    'The name of the test/val split.')
 
 tf.app.flags.DEFINE_string(
     'dataset_dir', 'data/coco/',
@@ -307,21 +309,5 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_float(
     'min_size', 2,
     'minimum size of an object')
-
-
-#################################
-#           TEST params         #
-#################################
-
-if _IS_TRAINING is True:
-    tf.app.flags.DEFINE_string(
-        'dataset_split_name', 'val2014',
-        'The name of the train/test/val split.')
-
-    tf.app.flags.DEFINE_float('learning_rate', 0.0000,
-                          'Initial learning rate.')
-
-    tf.app.flags.DEFINE_float(
-        'weight_decay', 0.00000, 'The weight decay on the model weights.')
 
 FLAGS = tf.app.flags.FLAGS
