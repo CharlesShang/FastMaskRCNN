@@ -20,6 +20,7 @@ import libs.nets.nets_factory as network
 import libs.preprocessings.coco_v1 as coco_preprocess
 import libs.nets.pyramid_network as pyramid_network
 import libs.nets.resnet_v1 as resnet_v1
+import libs.boxes.cython_bbox as cython_bbox
 
 from train.train_utils import _configure_learning_rate, _configure_optimizer, \
   _get_variables_to_train, _get_init_fn, get_var_list_to_restore
@@ -79,35 +80,35 @@ def restore(sess):
             time.sleep(2)
             return
         except:
-            print ('--restore_previous_if_exists is set, but failed to restore in %s %s'\
-                    % (FLAGS.train_dir, checkpoint_path))
-            time.sleep(2)
+            print (' failed to restore in %s %s' % (FLAGS.train_dir, checkpoint_path))
+            raise
 
-    if FLAGS.pretrained_model:
-        if tf.gfile.IsDirectory(FLAGS.pretrained_model):
-            checkpoint_path = tf.train.latest_checkpoint(FLAGS.pretrained_model)
-        else:
-            checkpoint_path = FLAGS.pretrained_model
+def evaluate(ap_threshold, gt_boxes, gt_masks, boxes, classes, probs, masks):
+    num_instances = gt_boxes.shape[0]
+    num_prediction = boxes.shape[0]
+    recall = []
+    precision = []
+    if num_instances is not 0 and num_prediction is not 0:
+        m = np.array(masks)
+        m = np.transpose(m,(0,3,1,2))
 
-        if FLAGS.checkpoint_exclude_scopes is None:
-            FLAGS.checkpoint_exclude_scopes='pyramid'
-        if FLAGS.checkpoint_include_scopes is None:
-            FLAGS.checkpoint_include_scopes='resnet_v1_50'
-
-        vars_to_restore = get_var_list_to_restore()
-        for var in vars_to_restore:
-            print ('restoring ', var.name)
-      
-        try:
-           restorer = tf.train.Saver(vars_to_restore)
-           restorer.restore(sess, checkpoint_path)
-           print ('Restored %d(%d) vars from %s' %(
-               len(vars_to_restore), len(tf.global_variables()),
-               checkpoint_path ))
-        except:
-           print ('Checking your params %s' %(checkpoint_path))
-           raise
+        overlaps = cython_bbox.bbox_overlaps(
+        np.ascontiguousarray(boxes[:, 0:4], dtype=np.float),
+        np.ascontiguousarray(gt_boxes[:, 0:4], dtype=np.float))
     
+
+        overlaps_recall = np.max(overlaps, axis=0)
+        overlaps_precision = np.max(overlaps, axis=1)
+        for i, threshold in enumerate(ap_threshold):
+            recall.append(np.sum(overlaps_recall > threshold))
+            precision.append(np.sum(overlaps_precision > threshold))
+    else:
+        for i, threshold in enumerate(ap_threshold):
+            recall.append(0)
+            precision.append(0)
+    return np.array(recall), np.array(precision), num_instances, num_prediction
+    
+                
 def test():
     """The main function that runs training"""
 
@@ -150,7 +151,6 @@ def test():
 
     ## solvers
     global_step = slim.create_global_step()
-    #update_op = solve(global_step)
 
     cropped_rois = tf.get_collection('__CROPPED__')[0]
     transposed = tf.get_collection('__TRANSPOSED__')[0]
@@ -181,18 +181,25 @@ def test():
                                          start=True))
 
     tf.train.start_queue_runners(sess=sess, coord=coord)
-    saver = tf.train.Saver(max_to_keep=20)
 
-    for step in range(FLAGS.max_iters):
+    ap_threshold = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+    total_recall = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    total_precision = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    total_instance = 0
+    total_prediction = 0
+
+
+    # for step in range(FLAGS.max_iters):
+    for step in range(2500):
         
         start_time = time.time()
 
         img_id_str, \
-        gt_boxesnp, \
+        gt_boxesnp, gt_masksnp,\
         input_imagenp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np, tmp_5np, \
         testing_mask_roisnp, testing_mask_final_masknp, testing_mask_final_clsesnp, testing_mask_final_scoresnp = \
                      sess.run([img_id] + \
-                              [gt_boxes] + \
+                              [gt_boxes] + [gt_masks] +\
                               [input_image] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4] + [tmp_5] + \
                               [testing_mask_rois] + [testing_mask_final_mask] + [testing_mask_final_clses] + [testing_mask_final_scores])
 
@@ -212,6 +219,26 @@ def test():
                       label=testing_mask_final_clsesnp, 
                       prob=testing_mask_final_scoresnp,
                       mask=testing_mask_final_masknp,)
+
+        if step % 1 == 0:   
+            draw_bbox(step, 
+                      np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
+                      name='test_gt', 
+                      bbox=gt_boxesnp[:,0:4], 
+                      label=gt_boxesnp[:,4].astype(np.int32), 
+                      prob=np.ones((gt_boxesnp.shape[0],81), dtype=np.float32),)
+
+        recall, precision, num_instances, num_prediction = evaluate(ap_threshold, gt_boxesnp, gt_masksnp, testing_mask_roisnp, testing_mask_final_clsesnp, testing_mask_final_scoresnp, testing_mask_final_masknp)
+        total_recall += recall
+        total_precision += precision
+        total_instance += num_instances
+        total_prediction += num_prediction
+
+        # print("recall       = {}".format([x / float(total_instance) for x in total_recall]))
+        # print("precision    = {}".format([x / float(total_prediction) for x in total_precision]))
+    print("recall       = {}".format(total_recall / float(total_instance)))
+    print("precision    = {}".format(total_precision / float(total_prediction)))
+
 
 
 if __name__ == '__main__':

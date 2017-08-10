@@ -43,6 +43,7 @@ def encode(gt_boxes, all_anchors, height, width, stride, indexs):
     #   (all_anchors[:, 2] < (width * stride) + border) &
     #   (all_anchors[:, 3] < (height * stride) + border))[0]
     # anchors = all_anchors[inds_inside, :]
+
     all_anchors = all_anchors.reshape([-1, 4])
     anchors = all_anchors
     total_anchors = all_anchors.shape[0]
@@ -145,7 +146,6 @@ def encode(gt_boxes, all_anchors, height, width, stride, indexs):
     bbox_targets = bbox_targets.reshape((1, height, width, -1))
     bbox_inside_weights = bbox_inside_weights.reshape((1, height, width, -1))
 
-
     return labels, bbox_targets, bbox_inside_weights, indexs
 
 def decode(boxes, scores, all_anchors, ih, iw):
@@ -231,21 +231,32 @@ if __name__ == '__main__':
     
     for i in range(10):
         cfg.FLAGS.fg_threshold = 0.1
-        classes = np.random.randint(0, 3, (50, 1))
+        classes = np.random.randint(0, 1, (50, 1))
         boxes = np.random.randint(10, 50, (50, 2))
         s = np.random.randint(20, 50, (50, 2))
         s = boxes + s
         boxes = np.concatenate((boxes, s), axis=1)
         gt_boxes = np.hstack((boxes, classes))
         # gt_boxes = boxes
-        rois = np.random.randint(10, 50, (20, 2))
-        s = np.random.randint(0, 20, (20, 2))
+
+        N = 100
+        rois = np.random.randint(10, 50, (N, 2))
+        s = np.random.randint(0, 20, (N, 2))
         s = rois + s
         rois = np.concatenate((rois, s), axis=1)
-        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=200, width=300, stride=4)
-        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=100, width=150, stride=8)
-        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=50, width=75, stride=16)
-        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=25, width=37, stride=32)
+        indexs = np.arange(N)
+
+        all_anchors = anchors_plane(200, 300, stride = 4, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=200, width=300, stride=4, indexs=indexs)
+
+        all_anchors = anchors_plane(100, 150, stride = 8, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=100, width=150, stride=8, indexs=indexs)
+
+        all_anchors = anchors_plane(50, 75, stride = 16, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=50, width=75, stride=16, indexs=indexs)
+
+        all_anchors = anchors_plane(25, 37, stride = 32, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=25, width=37, stride=32, indexs=indexs)
         # anchors, _, _ = anchors_plane(200, 300, stride=4, boarder=0)
   
     print('average time: %f' % ((time.time() - t)/10.0))

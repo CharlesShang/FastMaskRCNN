@@ -237,7 +237,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.01), activation_fn=None, normalizer_fn=None)
 
-          anchor_scales = [2, 4, 8, 16, 32]#[2 **(i-2), 2 ** (i-1), 2 **(i)]
+          anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)] #[2, 4, 8, 16, 32]#
           print("anchor_scales = " , anchor_scales)
           all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
           outputs['rpn'][p]={'box':box, 'cls':cls, 'anchor':all_anchors}
@@ -269,7 +269,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         if is_training is True:
           ### for training, rcnn and maskrcnn take rpn boxes as inputs
           rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn, rpn_rois_to_mask, rpn_scores_to_mask, rpn_batch_inds_to_mask, rpn_indexs_to_mask = \
-                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=False)
+                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
           # rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs, mask_rois, mask_scores, mask_batch_inds, mask_indexs = \
           #       sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
         else:

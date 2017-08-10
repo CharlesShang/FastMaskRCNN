@@ -187,7 +187,7 @@ def train():
             weight_decay=FLAGS.weight_decay, is_training=True)
     outputs = pyramid_network.build(end_points, im_shape[1], im_shape[2], pyramid_map,
             num_classes=81,
-            base_anchors=15,#9
+            base_anchors=9,#15
             is_training=True,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
             loss_weights=[10.0, 1.0, 1000.0, 1.0, 100.0])

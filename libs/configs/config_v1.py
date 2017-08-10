@@ -374,7 +374,7 @@ else:
         'The frequency with which the model is saved, in seconds.')
 
     tf.app.flags.DEFINE_integer(
-        'max_iters', 2500000,
+        'max_iters', 2500,
         'max iterations')
 
     ######################

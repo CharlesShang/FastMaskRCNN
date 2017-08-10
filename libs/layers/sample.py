@@ -20,7 +20,6 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   boxes: of shape (..., Ax4), each entry is [x1, y1, x2, y2], the last axis has k*4 dims
   scores: of shape (..., A), probs of fg, in [0, 1]
   """
-
   min_size = cfg.FLAGS.min_size
   rpn_nms_threshold = cfg.FLAGS.rpn_nms_threshold
   pre_nms_top_n = cfg.FLAGS.pre_nms_top_n
@@ -36,38 +35,44 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   scores = scores.reshape((-1, 1))
   assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
 
-  # filter backgrounds
-  # Hope this will filter most of background anchors, since a argsort is too slow..
+  ## filter backgrounds
+  ## Hope this will filter most of background anchors, since a argsort is too slow..
   if only_positive:
     keeps = np.where(scores > 0.5)[0]
     boxes = boxes[keeps, :]
     scores = scores[keeps]
     indexs = indexs[keeps]
 
-  # filter minimum size
+  ## filter minimum size
   keeps = _filter_boxes(boxes, min_size=min_size)
   boxes = boxes[keeps, :]
   scores = scores[keeps]
   indexs = indexs[keeps]
-  
 
-  # filter with nms
-  order = scores.ravel().argsort()[::-1]
-  if pre_nms_top_n > 0:
-    order = order[:pre_nms_top_n]
+  ## sort and filter before nms
+  if len(scores) <= pre_nms_top_n: ##full sort
+    order = scores.ravel().argsort()[::-1]
+    if pre_nms_top_n > 0:
+      order = order[:pre_nms_top_n]
+  else: ## partial + full sort
+    order = scores.ravel()
+    order = np.argsort((order[np.argpartition(-order, pre_nms_top_n)])[0:pre_nms_top_n:])[::-1]
   boxes = boxes[order, :]
   scores = scores[order]
   indexs = indexs[order]
 
+  ## filter by nms
   if with_nms is True:
     det = np.hstack((boxes, scores)).astype(np.float32)
     keeps = nms_wrapper.nms(det, rpn_nms_threshold)
 
+  ## filter after nms
   if post_nms_top_n > 0:
     keeps = keeps[:post_nms_top_n]
   boxes = boxes[keeps, :]
   scores = scores[keeps].astype(np.float32)
   indexs = indexs[keeps]
+
 
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 
@@ -128,14 +133,11 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
 
         keep_inds = bg_inds
         mask_fg_inds = bg_inds
-
-    
     
     return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds], indexs[keep_inds],\
            boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds], indexs[mask_fg_inds]
 
 def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
-
     min_size = cfg.FLAGS.min_size
     mask_nms_threshold = cfg.FLAGS.mask_nms_threshold
     post_nms_inst_n = cfg.FLAGS.post_nms_inst_n
@@ -261,16 +263,19 @@ if __name__ == '__main__':
   t = time.time()
   
   for i in range(10):
-    N = 200000
+    N = 700000
     boxes = np.random.randint(0, 50, (N, 2))
     s = np.random.randint(10, 40, (N, 2))
     s = boxes + s
     boxes = np.hstack((boxes, s))
     
     scores = np.random.rand(N, 1)
+    indexs = np.arange(N)
     # scores_ = 1 - np.random.rand(N, 1)
     # scores = np.hstack((scores, scores_))
   
-    boxes, scores = sample_rpn_outputs(boxes, scores, only_positive=False)
+    boxes, scores, batch_inds, indexs = sample_rpn_outputs(boxes, scores, indexs, only_positive=False)
+
+
   
   print ('average time %f' % ((time.time() - t) / 10))

@@ -24,16 +24,13 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
         for i, box in enumerate(bbox):
             if label is not None and not np.all(box==0):
                 if prob is not None:
-                    # print("prob")
-                    # print(prob.shape)
-                    # print("label")
-                    # print(label.shape)
                     if ((prob[i,label[i]] > vis_th) or (vis_all is True)) and ((ignore_bg is True) and (label[i] > 0)) :
                         if gt_label is not None:
                             if gt_label is not None and len(iou) > 1:
                                 text  = cat_id_to_cls_name(label[i]) + ' : ' + cat_id_to_cls_name(gt_label[i]) + ' : ' + str(iou[i])[:3]
                             else:
                                 text  = cat_id_to_cls_name(label[i]) + ' : ' + cat_id_to_cls_name(gt_label[i]) + ' : ' + str(prob[i][label[i]])[:4]
+                            
                             if label[i] != gt_label[i]:
                                 color = '#ff0000'#draw.text((2+bbox[i,0], 2+bbox[i,1]), cat_id_to_cls_name(label[i]) + ' : ' + cat_id_to_cls_name(gt_label[i]), fill='#ff0000')
                             else:
