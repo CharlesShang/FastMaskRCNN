@@ -25,6 +25,7 @@ import libs.nets.resnet_v1 as resnet_v1
 from train.train_utils import _configure_learning_rate, _configure_optimizer, \
   _get_variables_to_train, _get_init_fn, get_var_list_to_restore
 
+from libs.logs.log import LOG
 from PIL import Image, ImageFont, ImageDraw, ImageEnhance
 from libs.datasets import download_and_convert_coco
 from libs.visualization.pil_utils import cat_id_to_cls_name, draw_img, draw_bbox
@@ -272,7 +273,7 @@ def train():
 
         duration_time = time.time() - start_time
         if step % 1 == 0: 
-            print ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
+            LOG ( """iter %d: image-id:%07d, time:%.3f(sec), regular_loss: %.6f, """
                     """total-loss %.4f(%.4f, %.4f, %.6f, %.4f, %.4f), """
                     """instances: %d, """
                     """batch:(%d|%d, %d|%d, %d|%d)""" 
@@ -283,10 +284,10 @@ def train():
             # print (np.array(tmp_0np).shape)
             # print (np.array(tmp_1np).shape)
 
-            print ("target")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(training_rcnn_clses_targetnp),axis=1))))
-            print ("predict")
-            print (cat_id_to_cls_name(np.unique(np.argmax(np.array(training_rcnn_clsesnp),axis=1))))
+            LOG ("target")
+            LOG (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(training_rcnn_clses_targetnp),axis=1))))
+            LOG ("predict")
+            LOG (cat_id_to_cls_name(np.unique(np.argmax(np.array(training_rcnn_clsesnp),axis=1))))
 
         if step % 50 == 0: 
             draw_bbox(step, 
