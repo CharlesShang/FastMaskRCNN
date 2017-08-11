@@ -52,18 +52,18 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   # scores_ = scores
 
   ## filter before nms
-  # if len(scores) > pre_nms_top_n:
-  #   partial_order = scores.ravel()
-  #   partial_order = np.argpartition(-partial_order, pre_nms_top_n)[:pre_nms_top_n]
+  if len(scores) > pre_nms_top_n:
+    partial_order = scores.ravel()
+    partial_order = np.argpartition(-partial_order, pre_nms_top_n)[:pre_nms_top_n]
 
-  #   boxes = boxes[partial_order, :]
-  #   scores = scores[partial_order]
-  #   indexs = indexs[partial_order]
+    boxes = boxes[partial_order, :]
+    scores = scores[partial_order]
+    indexs = indexs[partial_order]
 
   ## sort
   order = scores.ravel().argsort()[::-1]
-  if len(order) > pre_nms_top_n:
-    order = order[:pre_nms_top_n]
+  # if pre_nms_top_n > 0:
+  #   order = order[:pre_nms_top_n]
   boxes = boxes[order, :]
   scores = scores[order]
   indexs = indexs[order]
@@ -108,7 +108,7 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   #   hs = boxes[:, 3] - boxes[:, 1]
   #   ws = boxes[:, 2] - boxes[:, 0]
   #   assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
-  
+  print(boxes.shape)  
   return boxes, scores, batch_inds, indexs
 
 def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training=False, only_positive=False):

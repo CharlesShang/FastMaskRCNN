@@ -32,40 +32,6 @@ from libs.visualization.pil_utils import cat_id_to_cls_name, draw_img, draw_bbox
 FLAGS = tf.app.flags.FLAGS
 resnet50 = resnet_v1.resnet_v1_50
 
-def solve(global_step):
-    """add solver to losses"""
-    # learning reate
-    lr = _configure_learning_rate(82783, global_step)
-    optimizer = _configure_optimizer(lr)
-    tf.summary.scalar('learning_rate', lr)
-
-    # compute and apply gradient
-    losses = tf.get_collection(tf.GraphKeys.LOSSES)
-    regular_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-    regular_loss = tf.add_n(regular_losses)
-    out_loss = tf.add_n(losses)
-    total_loss = tf.add_n(losses + regular_losses)
-
-    tf.summary.scalar('total_loss', total_loss)
-    tf.summary.scalar('out_loss', out_loss)
-    tf.summary.scalar('regular_loss', regular_loss)
-
-    update_ops = []
-    variables_to_train = _get_variables_to_train()
-    # update_op = optimizer.minimize(total_loss)
-    gradients = optimizer.compute_gradients(total_loss, var_list=variables_to_train)
-    grad_updates = optimizer.apply_gradients(gradients, 
-            global_step=global_step)
-    update_ops.append(grad_updates)
-    
-    # update moving mean and variance
-    if FLAGS.update_bn:
-        update_bns = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        update_bn = tf.group(*update_bns)
-        update_ops.append(update_bn)
-
-    return tf.group(*update_ops)
-
 def restore(sess):
     """choose which param to restore"""
     if FLAGS.restore_previous_if_exists:
