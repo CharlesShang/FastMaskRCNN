@@ -108,7 +108,7 @@ def sample_rpn_outputs(boxes, scores, indexs, is_training=False, only_positive=F
   #   hs = boxes[:, 3] - boxes[:, 1]
   #   ws = boxes[:, 2] - boxes[:, 0]
   #   assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
-  print(boxes.shape)  
+  # print(boxes.shape)  
   return boxes, scores, batch_inds, indexs
 
 def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training=False, only_positive=False):
@@ -123,9 +123,9 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
         max_overlaps = overlaps[np.arange(boxes.shape[0]), gt_assignment] # B
         fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
 
-        if True:
-            gt_argmax_overlaps = overlaps.argmax(axis=0) # G
-            fg_inds = np.union1d(gt_argmax_overlaps, fg_inds)
+        # if True:
+        #     gt_argmax_overlaps = overlaps.argmax(axis=0) # G
+        #     fg_inds = np.union1d(gt_argmax_overlaps, fg_inds)
 
         mask_fg_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
 
@@ -138,7 +138,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
         
         # TODO: sampling strategy
         bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-        bg_rois = int(max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3),  cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))#128
+        bg_rois = int(max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8))#128cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction
         if bg_inds.size > 0 and bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
@@ -147,7 +147,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
             mask_fg_inds = keep_inds
     else:
         bg_inds = np.arange(boxes.shape[0])
-        bg_rois = int(min(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction),  cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))#128
+        bg_rois = int(min(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction), 8))#128cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction
         if bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
@@ -157,16 +157,19 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, indexs, is_training
     return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds], indexs[keep_inds],\
            boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds], indexs[mask_fg_inds]
 
-def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
+def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=False):
     min_size = cfg.FLAGS.min_size
     mask_nms_threshold = cfg.FLAGS.mask_nms_threshold
     post_nms_inst_n = cfg.FLAGS.post_nms_inst_n
     if class_agnostic is True:
-        scores = prob[range(prob.shape[0]),classes]
+        scores = prob.max(axis=1)
 
         boxes = boxes.reshape((-1, 4))
+        classes = classes.reshape((-1, 1))
         scores = scores.reshape((-1, 1))
         indexs = indexs.reshape((-1, 1))
+        probs = probs.reshape((-1, 81))
+
         assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
 
         # filter background
@@ -204,7 +207,6 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
         det = np.hstack((boxes, scores)).astype(np.float32)
         keeps = nms_wrapper.nms(det, mask_nms_threshold)
         
-
         # filter low score
         if post_nms_inst_n > 0:
             keeps = keeps[:post_nms_inst_n]
@@ -220,13 +222,91 @@ def sample_rcnn_outputs(boxes, classes, prob, indexs, class_agnostic=True):
             scores = np.zeros((1, 1))
             indexs = np.zeros((1, 1))
             boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
-            classes = np.array([[0]])
+            classes = np.array([0])
             prob = np.zeros((1,81))
 
     else:
-        #@TODO
-        raise "inference nms type error"
-    
+        scores = prob.max(axis=1)
+
+        boxes = boxes.reshape((-1, 4))
+        classes = classes.reshape((-1, 1))
+        scores = scores.reshape((-1, 1))
+        indexs = indexs.reshape((-1, 1))
+        prob = prob.reshape((-1, 81))
+        assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
+
+        # filter background
+        keeps = np.where(classes != 0)[0]
+        scores = scores[keeps]
+        indexs = indexs[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+
+        # filter minimum size
+        keeps = _filter_boxes(boxes, min_size=min_size)
+        scores = scores[keeps]
+        indexs = indexs[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+        
+        #filter with scores
+        keeps = np.where(scores > 0.5)[0]
+        scores = scores[keeps]
+        indexs = indexs[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+
+        __scores = []
+        __indexs = []
+        __boxes = []
+        __classes = []
+        __prob = []
+
+        for c in range(1,(prob.shape[1])):
+          _keeps = (classes == c).reshape(-1)
+
+          _scores = scores[_keeps]
+          _indexs = indexs[_keeps]
+          _boxes = boxes[_keeps, :]
+          _classes = classes[_keeps]
+          _prob = prob[_keeps, :]
+
+          # filter with nms
+          _order = _scores.ravel().argsort()[::-1]
+          _scores = _scores[_order]
+          _indexs = _indexs[_order]
+          _boxes = _boxes[_order, :]
+          _classes = _classes[_order]
+          _prob = _prob[_order, :]
+
+          _det = np.hstack((_boxes, _scores)).astype(np.float32)
+          _keeps = nms_wrapper.nms(_det, mask_nms_threshold)
+          
+          # filter low score
+          if post_nms_inst_n > 0:
+              _keeps = _keeps[:post_nms_inst_n]
+          __scores.append(_scores[_keeps])
+          __indexs.append(_indexs[_keeps])
+          __boxes.append(_boxes[_keeps, :])
+          __classes.append(_classes[_keeps])
+          __prob.append(_prob[_keeps, :])
+
+        scores = np.vstack(__scores)
+        indexs = np.vstack(__indexs)
+        boxes = np.vstack(__boxes)
+        classes = np.vstack(__classes).reshape(-1)
+        prob = np.vstack(__prob)
+
+        if len(classes) is 0:
+            scores = np.zeros((1, 1))
+            indexs = np.zeros((1, 1))
+            boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
+            classes = np.array([0]).reshape(-1)
+            prob = np.zeros((1,81))
+
     batch_inds = np.zeros([boxes.shape[0]])
 
     return boxes.astype(np.float32), classes.astype(np.int32), prob.astype(np.float32), batch_inds.astype(np.int32), indexs.astype(np.int32)

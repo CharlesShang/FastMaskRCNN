@@ -149,7 +149,7 @@ def _compute_targets(ex_rois, gt_rois, labels, num_classes):
     start = 4 * cls
     end = start + 4
     bbox_targets[ind, start:end] = targets[ind, 0:4]
-    bbox_inside_weights[ind, start:end] = 1
+    bbox_inside_weights[ind, start:end] = 1.0
   return bbox_targets, bbox_inside_weights
 
 def _unmap(data, count, inds, fill=0):

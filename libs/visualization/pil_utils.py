@@ -36,7 +36,7 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
                             else:
                                 color = '#0000ff'  
                         else: 
-                            text = cat_id_to_cls_name(label[i]) + ' : ' + str(i)#+ str(prob[i][label[i]])[:4]
+                            text = cat_id_to_cls_name(label[i]) + ' : ' +  "{:.3f}".format(prob[i][label[i]])  #str(i)#+
                         draw.text((2+bbox[i,0], 2+bbox[i,1]), text, fill=color)
 
                         if _DEBUG is True:

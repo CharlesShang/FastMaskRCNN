@@ -25,16 +25,10 @@ _BN = True
 
 # mapping each stage to its' tensor features
 _networks_map = {
-  # 'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
-  #              'C2':'resnet_v1_50/block1/unit_2/bottleneck_v1',
-  #              'C3':'resnet_v1_50/block2/unit_3/bottleneck_v1',
-  #              'C4':'resnet_v1_50/block3/unit_5/bottleneck_v1',
-  #              'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
-  #              },
   'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
-               'C2':'resnet_v1_50/block1/unit_3/bottleneck_v1',
-               'C3':'resnet_v1_50/block2/unit_4/bottleneck_v1',
-               'C4':'resnet_v1_50/block3/unit_6/bottleneck_v1',
+               'C2':'resnet_v1_50/block1/unit_2/bottleneck_v1',
+               'C3':'resnet_v1_50/block2/unit_3/bottleneck_v1',
+               'C4':'resnet_v1_50/block3/unit_5/bottleneck_v1',
                'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
                },
   'resnet101': {'C1': '', 'C2': '',
@@ -66,11 +60,8 @@ def _extra_conv_arg_scope_with_bn(weight_decay=0.00001,
       normalizer_fn=slim.batch_norm,
       normalizer_params=batch_norm_params):
     # with slim.arg_scope([slim.batch_norm], **batch_norm_params):
-    with slim.arg_scope([slim.max_pool2d], padding='SAME'): 
-      with slim.arg_scope([slim.fully_connected],
-          normalizer_fn=slim.batch_norm,
-          normalizer_params=batch_norm_params) as arg_sc:
-        return arg_sc
+    with slim.arg_scope([slim.max_pool2d], padding='SAME') as arg_sc:
+      return arg_sc
 
 def _extra_conv_arg_scope(weight_decay=0.00001, activation_fn=None, normalizer_fn=None):
 
@@ -283,7 +274,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
           #       sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
         else:
           ### for testing, only rcnn takes rpn boxes as inputs. maskrcnn takes rcnn boxes as inputs
-          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs, only_positive=False)
+          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs, only_positive=True)
 
         ### assign pyramid layer indexs to rcnn network's ROIs
         [rcnn_assigned_rois, rcnn_assigned_batch_inds, rcnn_assigned_indexs, rcnn_assigned_layer_inds] = \
@@ -313,9 +304,9 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         rcnn = slim.max_pool2d(rcnn_cropped_features, [3, 3], stride=2, padding='SAME')
         rcnn = slim.flatten(rcnn)
         rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
-        #rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=True)#is_training
+        rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)
         rcnn = slim.fully_connected(rcnn,  1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
-        #rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=True)#is_training
+        rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)
         rcnn_clses = slim.fully_connected(rcnn, num_classes, activation_fn=None, normalizer_fn=None, 
                 weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         rcnn_boxes = slim.fully_connected(rcnn, num_classes*4, activation_fn=None, normalizer_fn=None, 
@@ -521,18 +512,16 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         rcnn_ordered_index = outputs['rcnn_ordered_index'] 
         rcnn_boxes = outputs['rcnn_boxes']
         rcnn_clses = outputs['rcnn_clses']
-        rcnn_scores = outputs['rcnn_scores']
 
         rcnn_clses_target, rcnn_boxes_target, rcnn_boxes_inside_weight, max_overlaps, rcnn_ordered_index = \
           roi_encoder(gt_boxes, rcnn_ordered_rois, num_classes, rcnn_ordered_index, scope='ROIEncoder')
 
-        rcnn_clses_target, rcnn_ordered_index, rcnn_ordered_rois, rcnn_clses, rcnn_scores, rcnn_boxes, rcnn_boxes_target, rcnn_boxes_inside_weight = \
+        rcnn_clses_target, rcnn_ordered_index, rcnn_ordered_rois, rcnn_clses, rcnn_boxes, rcnn_boxes_target, rcnn_boxes_inside_weight = \
                 _filter_negative_samples(tf.reshape(rcnn_clses_target, [-1]),[
                     tf.reshape(rcnn_clses_target, [-1]),
                     tf.reshape(rcnn_ordered_index, [-1]),
                     tf.reshape(rcnn_ordered_rois, [-1, 4]),
                     tf.reshape(rcnn_clses, [-1, num_classes]),
-                    tf.reshape(rcnn_scores, [-1, num_classes]),
                     tf.reshape(rcnn_boxes, [-1, num_classes * 4]),
                     tf.reshape(rcnn_boxes_target, [-1, num_classes * 4]),
                     tf.reshape(rcnn_boxes_inside_weight, [-1, num_classes * 4])
@@ -560,10 +549,8 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         tf.add_to_collection(tf.GraphKeys.LOSSES, rcnn_cls_loss)
         rcnn_cls_losses.append(rcnn_cls_loss)
 
-        outputs['training_rcnn_rois'] = rcnn_ordered_rois
         outputs['training_rcnn_clses_target'] = rcnn_clses_target
         outputs['training_rcnn_clses'] = rcnn_clses
-        outputs['training_rcnn_scores'] = rcnn_scores
 
         ### mask loss
         # mask of shape (N, h, w, num_classes)

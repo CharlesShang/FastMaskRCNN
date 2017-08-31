@@ -42,7 +42,7 @@ tf.app.flags.DEFINE_string(
     'The name of the train split.')
 
 tf.app.flags.DEFINE_string(
-    'dataset_split_name_test', 'val2014',
+    'dataset_split_name_test', 'train2014',#val2014
     'The name of the test/val split.')
 
 tf.app.flags.DEFINE_string(
@@ -134,7 +134,7 @@ tf.app.flags.DEFINE_string(
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.0002,
+tf.app.flags.DEFINE_float('learning_rate', 0.001,
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -232,15 +232,15 @@ tf.app.flags.DEFINE_boolean(
 #######################
 
 tf.app.flags.DEFINE_float(
-    'rpn_fg_threshold', 0.7,
+    'rpn_fg_threshold', 0.5,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'rpn_bg_threshold', 0.3,
+    'rpn_bg_threshold', 0.5,
     'Only regions which intersection is less than bg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'fg_threshold', 0.7,
+    'fg_threshold', 0.5,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(

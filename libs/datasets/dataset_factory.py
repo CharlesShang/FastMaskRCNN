@@ -18,8 +18,8 @@ def get_dataset(dataset_name, split_name, dataset_dir,
     tfrecords = glob.glob(dataset_dir + '/records/' + file_pattern)
     image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = coco.read(tfrecords, is_training=is_training)
 
-    image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training)
+    image, new_ih, new_iw, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training)
     #visualize_input(gt_boxes, image, tf.expand_dims(gt_masks, axis=3))
 
-    return image, ih, iw, gt_boxes, gt_masks, num_instances, img_id
+    return image, ih, iw, new_ih, new_iw, gt_boxes, gt_masks, num_instances, img_id
 
