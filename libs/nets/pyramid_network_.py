@@ -269,7 +269,7 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
           cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.01), activation_fn=None, normalizer_fn=None)
 
-          anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)] #[2, 4, 8, 16, 32]#
+          anchor_scales = [2, 4, 8, 16, 32]#[2 **(i-2), 2 ** (i-1), 2 **(i)] #
           print("anchor_scales = " , anchor_scales)
           all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
           outputs['rpn'][p]={'box':box, 'cls':cls, 'anchor':all_anchors}

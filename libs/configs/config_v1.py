@@ -30,7 +30,7 @@ tf.app.flags.DEFINE_bool(
     'Whether or not to update bacth normalization layer')
 
 tf.app.flags.DEFINE_integer(
-    'num_readers', 4,
+    'num_readers', 1,
     'The number of parallel readers that read data from the dataset.')
 
 tf.app.flags.DEFINE_string(
@@ -79,10 +79,10 @@ tf.app.flags.DEFINE_integer(
 ######################
 
 tf.app.flags.DEFINE_float(
-    'weight_decay', 0.00005, 'The weight decay on the model weights.')
+    'weight_decay', 0.0005, 'The weight decay on the model weights.')
 
 tf.app.flags.DEFINE_string(
-    'optimizer', 'momentum',
+    'optimizer', 'adam',
     'The name of the optimizer, one of "adadelta", "adagrad", "adam",'
     '"ftrl", "momentum", "sgd" or "rmsprop".')
 
@@ -118,7 +118,7 @@ tf.app.flags.DEFINE_float(
     'ftrl_l2', 0.0, 'The FTRL l2 regularization strength.')
 
 tf.app.flags.DEFINE_float(
-    'momentum', 0.99,
+    'momentum', 0.9,
     'The momentum for the MomentumOptimizer and RMSPropOptimizer.')
 
 tf.app.flags.DEFINE_float('rmsprop_momentum', 0.99, 'Momentum.')
@@ -232,15 +232,15 @@ tf.app.flags.DEFINE_boolean(
 #######################
 
 tf.app.flags.DEFINE_float(
-    'rpn_fg_threshold', 0.5,
+    'rpn_fg_threshold', 0.7,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'rpn_bg_threshold', 0.5,
+    'rpn_bg_threshold', 0.3,
     'Only regions which intersection is less than bg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'fg_threshold', 0.5,
+    'fg_threshold', 0.7,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
@@ -260,23 +260,23 @@ tf.app.flags.DEFINE_float(
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
-    'rpn_batch_size', 512,
+    'rpn_batch_size', 128,
     'Number of rpn anchors that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
-    'allow_border', 10,
-    'How many pixels out of an image')
+    'allow_border', 0.0,
+    'Percentage of bounding box height and length that are allowed to be out of an image boundary')
 
 ##################################
 #            NMS                #
 ##################################
 
 tf.app.flags.DEFINE_integer(
-    'pre_nms_top_n', 12000,
+    'pre_nms_top_n', 200,#12000,
     'Number of rpn anchors that should be sampled before nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_top_n', 2000,
+    'post_nms_top_n', 10, #2000
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_integer(

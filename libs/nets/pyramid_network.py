@@ -100,8 +100,8 @@ def _smooth_l1_dist(x, y, sigma2=9.0, name='smooth_l1_dist'):
   ------
   dist: element-wise distance, as the same shape of x, y
   """
-  deltas = x - y
   with tf.name_scope(name=name) as scope:
+    deltas = x - y
     deltas_abs = tf.abs(deltas)
     smoothL1_sign = tf.cast(tf.less(deltas_abs, 1.0 / sigma2), tf.float32)
     return tf.square(deltas) * 0.5 * sigma2 * smoothL1_sign + \
@@ -118,7 +118,7 @@ def _get_valid_sample_fraction(labels, p=0):
     return frac, frac_
 
 
-def _filter_negative_samples(labels, tensors):
+def _filter_negative_samples(labels, tensors, name='_filter_negative_samples'):
     """keeps only samples with none-negative labels 
     Params:
     -----
@@ -130,14 +130,15 @@ def _filter_negative_samples(labels, tensors):
     tensors: filtered tensors
     """
     # return tensors
-    keeps = tf.where(tf.greater_equal(labels, 0))
-    keeps = tf.reshape(keeps, [-1])
+    with tf.name_scope(name=name) as scope:
+      keeps = tf.where(tf.greater_equal(labels, 0))
+      keeps = tf.reshape(keeps, [-1])
 
-    filtered = []
-    for t in tensors:
-        tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0])
-        f = tf.gather(t, keeps)
-        filtered.append(f)
+      filtered = []
+      for t in tensors:
+          tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0])
+          f = tf.gather(t, keeps)
+          filtered.append(f)
 
     return filtered
         
@@ -209,7 +210,7 @@ def build_pyramid(net_name, end_points, bilinear=True, is_training=True):
       
       return pyramid
   
-def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, gt_boxes=None):
+def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_training=False, gt_boxes=None, bilinear=True):
   """Build the 3-way outputs, i.e., class, box and mask in the pyramid
   Algo
   ----
@@ -222,33 +223,73 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
     6. Build the mask layer
     7. Build losses
   """
+  #strides = [-1, -1, 8, 16, 32, 32]
+  pyramid = {}
   outputs = {}
+  if isinstance(net_name, str):
+    pyramid_map = _networks_map[net_name]
+  else:
+    pyramid_map = net_name
+  # pyramid['inputs'] = end_points['inputs']
   if _BN is True:
     # arg_scope = _extra_conv_arg_scope_with_bn()
     arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
+  #
+  with tf.variable_scope('pyramid'):
+    with slim.arg_scope(arg_scope):
+      
+        pyramid['P5'] = \
+          slim.conv2d(end_points[pyramid_map['C5']], 256, [1, 1], stride=1, activation_fn=None, scope='C5')
+        
+        for c in range(4, 1, -1):
+          s, s_ = pyramid['P%d'%(c+1)], end_points[pyramid_map['C%d' % (c)]]
 
-  with slim.arg_scope(arg_scope):
-    with tf.variable_scope('pyramid'):
-        ### for p in pyramid
-        outputs['rpn'] = {}
+          # s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
+          
+          up_shape = tf.shape(s_)
+          # out_shape = tf.stack((up_shape[1], up_shape[2]))
+          # s = slim.conv2d(s, 256, [3, 3], stride=1, scope='C%d'%c)
+          s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='C%d/upscale'%c)
+          s_ = slim.conv2d(s_, 256, [1,1], stride=1, activation_fn=None, scope='C%d'%c)
+          
+          s = tf.add(s, s_, name='C%d/addition'%c)
+          s = slim.conv2d(s, 256, [3,3], stride=1, activation_fn=None, scope='C%d/fusion'%c)
+          
+          pyramid['P%d'%(c)] = s
+
+          ### for p in pyramid
+          outputs['rpn'] = {}
+
+
         for i in range(5, 1, -1):
           p = 'P%d'%i
-          stride = 2 ** i
-          
+          stride = min(2*(2**i), 32)#strides[i]#2 ** i
+
           ### rpn head
           shape = tf.shape(pyramid[p])
           height, width = shape[1], shape[2]
-          rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='%s/rpn'%p)
+          rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, scope='%s/rpn'%p)
           box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.001), activation_fn=None, normalizer_fn=None)
           cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.01), activation_fn=None, normalizer_fn=None)
 
-          anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)] #[2, 4, 8, 16, 32]#
+          anchor_scales = [2, 4, 8, 16, 32]#[2 **(i-2), 2 ** (i-1), 2 **(i)] #
           print("anchor_scales = " , anchor_scales)
           all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
+          # if i == 5:
+          #   outputs['tmp_5'] = all_anchors
+          # elif i == 4:
+          #   outputs['tmp_4'] = all_anchors
+          # elif i == 3:
+          #   outputs['tmp_3'] = all_anchors
+          # elif i == 2:
+          #   outputs['tmp_2'] = all_anchors
+          #   outputs['tmp_1'] = width
+          #   outputs['tmp_0'] = height
+
           outputs['rpn'][p]={'box':box, 'cls':cls, 'anchor':all_anchors}
 
         ### gather all rois
@@ -260,12 +301,7 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         rpn_anchors = tf.concat(values=rpn_anchors, axis=0)
         
         rpn_probs = tf.nn.softmax(tf.reshape(rpn_clses, [-1, 2]))
-        rpn_final_boxes, rpn_final_clses, rpn_final_scores, indexs = anchor_decoder(rpn_boxes, rpn_probs, rpn_anchors, ih, iw)
-
-        outputs['rpn']['P5']['index'] = indexs[0:(tf.shape(tf.reshape(outputs['rpn']['P5']['box'], [-1, 4]))[0])] 
-        for i in range(4, 1, -1):
-          p = 'P%d'%i
-          outputs['rpn'][p]['index'] = indexs[outputs['rpn']['P%d'%(i+1)]['index'][-1] + 1 :outputs['rpn']['P%d'%(i+1)]['index'][-1] + 1 + tf.shape(tf.reshape(outputs['rpn']['P%d'%(i)]['box'], [-1, 4]))[0]] 
+        rpn_final_boxes, rpn_final_clses, rpn_final_scores = anchor_decoder(rpn_boxes, rpn_probs, rpn_anchors, ih, iw)
 
         outputs['rpn_boxes'] = rpn_boxes
         outputs['rpn_clses'] = rpn_clses
@@ -273,45 +309,38 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         outputs['rpn_final_boxes'] = rpn_final_boxes
         outputs['rpn_final_clses'] = rpn_final_clses
         outputs['rpn_final_scores'] = rpn_final_scores
-        outputs['rpn_indexs'] = indexs
 
         if is_training is True:
           ### for training, rcnn and maskrcnn take rpn boxes as inputs
-          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn, rpn_rois_to_mask, rpn_scores_to_mask, rpn_batch_inds_to_mask, rpn_indexs_to_mask = \
-                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=False)
-          # rcnn_rois, rcnn_scores, rcnn_batch_inds, rcnn_indexs, mask_rois, mask_scores, mask_batch_inds, mask_indexs = \
-          #       sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, indexs, is_training=is_training, only_positive=True)
+          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_rois_to_mask, rpn_scores_to_mask, rpn_batch_inds_to_mask = \
+                sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, is_training=is_training, only_positive=False)
         else:
           ### for testing, only rcnn takes rpn boxes as inputs. maskrcnn takes rcnn boxes as inputs
-          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, indexs, only_positive=False)
+          rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, only_positive=False)
 
         ### assign pyramid layer indexs to rcnn network's ROIs
-        [rcnn_assigned_rois, rcnn_assigned_batch_inds, rcnn_assigned_indexs, rcnn_assigned_layer_inds] = \
-                assign_boxes(rpn_rois_to_rcnn, [rpn_rois_to_rcnn, rpn_batch_inds_to_rcnn, rpn_indexs_to_rcnn], [2, 3, 4, 5])
+        [rcnn_assigned_rois, rcnn_assigned_batch_inds, rcnn_assigned_layer_inds] = \
+                assign_boxes(rpn_rois_to_rcnn, [rpn_rois_to_rcnn, rpn_batch_inds_to_rcnn], [2, 3, 4, 5])
 
         ### crop features from pyramid for rcnn network
         rcnn_cropped_features = []
         rcnn_ordered_rois = []
-        rcnn_ordered_index = []
         for i in range(5, 1, -1):
             p = 'P%d'%i
             rcnn_splitted_roi = rcnn_assigned_rois[i-2]
             rcnn_batch_ind = rcnn_assigned_batch_inds[i-2]
-            rcnn_index = rcnn_assigned_indexs[i-2]
             rcnn_cropped_feature, rcnn_rois_to_crop_and_resize, rcnn_py_shape, rcnn_ihiw = ROIAlign(pyramid[p], rcnn_splitted_roi, rcnn_batch_ind, ih, iw, stride=2**i,
-                               pooled_height=14, pooled_width=14)
+                               pooled_height=7, pooled_width=7)
             rcnn_cropped_features.append(rcnn_cropped_feature)
             rcnn_ordered_rois.append(rcnn_splitted_roi)
-            rcnn_ordered_index.append(rcnn_index)
             
         rcnn_cropped_features = tf.concat(values=rcnn_cropped_features, axis=0)
         rcnn_ordered_rois = tf.concat(values=rcnn_ordered_rois, axis=0)
-        rcnn_ordered_index = tf.concat(values=rcnn_ordered_index, axis=0)
 
         ### rcnn head
         # to 7 x 7
-        rcnn = slim.max_pool2d(rcnn_cropped_features, [3, 3], stride=2, padding='SAME')
-        rcnn = slim.flatten(rcnn)
+        #rcnn = slim.max_pool2d(rcnn_cropped_features, [2, 2], stride=2, padding='SAME')
+        rcnn = slim.flatten(rcnn_cropped_features)
         rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         #rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=True)#is_training
         rcnn = slim.fully_connected(rcnn,  1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
@@ -326,7 +355,6 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         rcnn_final_boxes, rcnn_final_classes, rcnn_final_scores = roi_decoder(rcnn_boxes, rcnn_scores, rcnn_ordered_rois, ih, iw)
 
         outputs['rcnn_ordered_rois'] = rcnn_ordered_rois
-        outputs['rcnn_ordered_index'] = rcnn_ordered_index
         outputs['rcnn_cropped_features'] = rcnn_cropped_features
         tf.add_to_collection('__CROPPED__', rcnn_cropped_features)
         outputs['rcnn_boxes'] = rcnn_boxes
@@ -338,38 +366,32 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         
         ### assign pyramid layer indexs to mask network's ROIs
         if is_training:
-          [mask_assigned_rois, mask_assigned_batch_inds, mask_assigned_indexs, mask_assigned_layer_inds] = \
-               assign_boxes(rpn_rois_to_mask, [rpn_rois_to_mask, rpn_batch_inds_to_mask, rpn_indexs_to_mask], [2, 3, 4, 5])
+          [mask_assigned_rois, mask_assigned_batch_inds, mask_assigned_layer_inds] = \
+               assign_boxes(rpn_rois_to_mask, [rpn_rois_to_mask, rpn_batch_inds_to_mask], [2, 3, 4, 5])
 
           mask_cropped_features = []
           mask_ordered_rois = []
-          mask_ordered_indexs = []
           ### crop features from pyramid for mask network
           for i in range(5, 1, -1):
               p = 'P%d'%i
               mask_splitted_roi = mask_assigned_rois[i-2]
               mask_batch_ind = mask_assigned_batch_inds[i-2]
-              mask_index = mask_assigned_indexs[i-2]
               mask_cropped_feature, mask_rois_to_crop_and_resize, mask_py_shape, mask_ihiw = ROIAlign(pyramid[p], mask_splitted_roi, mask_batch_ind, ih, iw, stride=2**i,
                                  pooled_height=14, pooled_width=14)
               mask_cropped_features.append(mask_cropped_feature)
               mask_ordered_rois.append(mask_splitted_roi)
-              mask_ordered_indexs.append(mask_index)
               
           mask_cropped_features = tf.concat(values=mask_cropped_features, axis=0)
           mask_ordered_rois = tf.concat(values=mask_ordered_rois, axis=0)
-          mask_ordered_indexs = tf.concat(values=mask_ordered_indexs, axis=0)
 
         else:
           ### for testing, mask network takes rcnn boxes as inputs
-          rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask, rcnn_indexs_to_mask = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
-          # mask_rois, mask_clses, mask_scores, mask_batch_inds, mask_indexs = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, rcnn_ordered_index) 
-          [mask_assigned_rois, mask_assigned_clses, mask_assigned_scores, mask_assigned_batch_inds, mask_assign_indexs, mask_assigned_layer_inds] =\
-               assign_boxes(rcnn_rois_to_mask, [rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask, rcnn_indexs_to_mask], [2, 3, 4, 5])
+          rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores) 
+          [mask_assigned_rois, mask_assigned_clses, mask_assigned_scores, mask_assigned_batch_inds, mask_assigned_layer_inds] =\
+               assign_boxes(rcnn_rois_to_mask, [rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask], [2, 3, 4, 5])
 
           mask_cropped_features = []
           mask_ordered_rois = []
-          mask_ordered_indexs = []
           mask_ordered_clses = []
           mask_ordered_scores = []
           for i in range(5, 1, -1):
@@ -378,18 +400,15 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
             mask_splitted_cls = mask_assigned_clses[i-2]
             mask_splitted_score = mask_assigned_scores[i-2]
             mask_batch_ind = mask_assigned_batch_inds[i-2]
-            mask_index = mask_assign_indexs[i-2]
             mask_cropped_feature, mask_rois_to_crop_and_resize, mask_py_shape, mask_ihiw = ROIAlign(pyramid[p], mask_splitted_roi, mask_batch_ind, ih, iw, stride=2**i,
                                pooled_height=14, pooled_width=14)
             mask_cropped_features.append(mask_cropped_feature)
             mask_ordered_rois.append(mask_splitted_roi)
-            mask_ordered_indexs.append(mask_index)
             mask_ordered_clses.append(mask_splitted_cls)
             mask_ordered_scores.append(mask_splitted_score)
 
           mask_cropped_features = tf.concat(values=mask_cropped_features, axis=0)
           mask_ordered_rois = tf.concat(values=mask_ordered_rois, axis=0)
-          mask_ordered_indexs = tf.concat(values=mask_ordered_indexs, axis=0)
           mask_ordered_clses = tf.concat(values=mask_ordered_clses, axis=0)
           mask_ordered_scores = tf.concat(values=mask_ordered_scores, axis=0)
 
@@ -406,14 +425,13 @@ def build_heads(pyramid, ih, iw, num_classes, base_anchors, is_training=False, g
         m = slim.conv2d(m, num_classes, [1, 1], stride=1, padding='VALID', activation_fn=None, normalizer_fn=None)
 
         outputs['mask_ordered_rois'] = mask_ordered_rois
-        outputs['mask_ordered_indexs'] = mask_ordered_indexs
         outputs['mask_cropped_features'] = mask_cropped_features 
         outputs['mask_mask'] = m
         outputs['mask_final_mask'] = tf.nn.sigmoid(m)
           
-        return outputs
+        return pyramid, outputs
 
-def build_losses(pyramid, outputs, gt_boxes, gt_masks,
+def build_losses(pyramid, ih, iw, outputs, gt_boxes, gt_masks,
                  num_classes, base_anchors,
                  rpn_box_lw =0.1, rpn_cls_lw = 0.1,
                  rcnn_box_lw=1.0, rcnn_cls_lw=0.1,
@@ -445,6 +463,8 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
   rcnn_batch_pos = []
   mask_batch_pos = []
 
+  strides = [-1, -1, 8, 16, 32, 32]
+
   if _BN is True:
     # arg_scope = _extra_conv_arg_scope_with_bn()
     arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
@@ -459,7 +479,7 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         ## build losses for PFN
         for i in range(5, 1, -1):
             p = 'P%d' % i
-            stride = 2 ** i
+            stride = stride = min(2*(2**i), 32)#strides[i]#2 ** i
             shape = tf.shape(pyramid[p])
             height, width = shape[1], shape[2]
 
@@ -471,17 +491,15 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
             # anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)]
             # all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
             all_anchors = outputs['rpn'][p]['anchor']
-            all_indexs = outputs['rpn'][p]['index']
             rpn_boxes = outputs['rpn'][p]['box']
             rpn_clses = tf.reshape(outputs['rpn'][p]['cls'], (1, height, width, base_anchors, 2))
 
-            rpn_clses_target, rpn_boxes_target, rpn_boxes_inside_weight, all_indexs = \
-              anchor_encoder(splitted_gt_boxes, all_anchors, height, width, stride, all_indexs, scope='AnchorEncoder')
+            rpn_clses_target, rpn_boxes_target, rpn_boxes_inside_weight = \
+              anchor_encoder(splitted_gt_boxes, all_anchors, height, width, stride, ih, iw, scope='AnchorEncoder')
 
-            rpn_clses_target, all_indexs, rpn_clses, rpn_boxes, rpn_boxes_target, rpn_boxes_inside_weight = \
+            rpn_clses_target, rpn_clses, rpn_boxes, rpn_boxes_target, rpn_boxes_inside_weight = \
                     _filter_negative_samples(tf.reshape(rpn_clses_target, [-1]), [
                         tf.reshape(rpn_clses_target, [-1]),
-                        tf.reshape(all_indexs, [-1]),
                         tf.reshape(rpn_clses, [-1, 2]),
                         tf.reshape(rpn_boxes, [-1, 4]),
                         tf.reshape(rpn_boxes_target, [-1, 4]),
@@ -518,18 +536,16 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         # 1. encode ground truth
         # 2. compute distances
         rcnn_ordered_rois = outputs['rcnn_ordered_rois']
-        rcnn_ordered_index = outputs['rcnn_ordered_index'] 
         rcnn_boxes = outputs['rcnn_boxes']
         rcnn_clses = outputs['rcnn_clses']
         rcnn_scores = outputs['rcnn_scores']
 
-        rcnn_clses_target, rcnn_boxes_target, rcnn_boxes_inside_weight, max_overlaps, rcnn_ordered_index = \
-          roi_encoder(gt_boxes, rcnn_ordered_rois, num_classes, rcnn_ordered_index, scope='ROIEncoder')
+        rcnn_clses_target, rcnn_boxes_target, rcnn_boxes_inside_weight = \
+          roi_encoder(gt_boxes, rcnn_ordered_rois, num_classes, scope='ROIEncoder')
 
-        rcnn_clses_target, rcnn_ordered_index, rcnn_ordered_rois, rcnn_clses, rcnn_scores, rcnn_boxes, rcnn_boxes_target, rcnn_boxes_inside_weight = \
+        rcnn_clses_target, rcnn_ordered_rois, rcnn_clses, rcnn_scores, rcnn_boxes, rcnn_boxes_target, rcnn_boxes_inside_weight = \
                 _filter_negative_samples(tf.reshape(rcnn_clses_target, [-1]),[
                     tf.reshape(rcnn_clses_target, [-1]),
-                    tf.reshape(rcnn_ordered_index, [-1]),
                     tf.reshape(rcnn_ordered_rois, [-1, 4]),
                     tf.reshape(rcnn_clses, [-1, num_classes]),
                     tf.reshape(rcnn_scores, [-1, num_classes]),
@@ -568,19 +584,17 @@ def build_losses(pyramid, outputs, gt_boxes, gt_masks,
         ### mask loss
         # mask of shape (N, h, w, num_classes)
         mask_ordered_rois = outputs['mask_ordered_rois']
-        mask_ordered_indexs = outputs['mask_ordered_indexs'] 
         masks = outputs['mask_mask']
 
-        mask_clses_target, mask_targets, mask_inside_weights, mask_rois, mask_ordered_indexs= \
-          mask_encoder(gt_masks, gt_boxes, mask_ordered_rois, num_classes, 28, 28, mask_ordered_indexs,scope='MaskEncoder')
+        mask_clses_target, mask_targets, mask_inside_weights, mask_rois = \
+          mask_encoder(gt_masks, gt_boxes, mask_ordered_rois, num_classes, 28, 28,scope='MaskEncoder')
 
-        mask_clses_target, mask_targets, mask_inside_weights, mask_rois, mask_ordered_indexs, masks = \
+        mask_clses_target, mask_targets, mask_inside_weights, mask_rois, masks = \
                 _filter_negative_samples(tf.reshape(mask_clses_target, [-1]), [
                     tf.reshape(mask_clses_target, [-1]),
                     tf.reshape(mask_targets, [-1, 28, 28, num_classes]),
                     tf.reshape(mask_inside_weights, [-1, 28, 28, num_classes]),
                     tf.reshape(mask_rois, [-1, 4]),
-                    tf.reshape(mask_ordered_indexs, [-1]),
                     tf.reshape(masks, [-1, 28, 28, num_classes]),
                     ])
 
@@ -636,13 +650,13 @@ def build(end_points, image_height, image_width, pyramid_map,
         gt_masks=None, 
         loss_weights=[0.1, 0.1, 1.0, 0.1, 1.0]):
     
-    pyramid = build_pyramid(pyramid_map, end_points, is_training=is_training)
+    #pyramid = build_pyramid(pyramid_map, end_points, is_training=is_training)
 
     if is_training: 
-      outputs = \
-          build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
+      pyramid, outputs = \
+          build_heads(pyramid_map, end_points, image_height, image_width, num_classes, base_anchors, 
                       is_training=is_training, gt_boxes=gt_boxes)
-      loss, losses, batch_info = build_losses(pyramid, outputs, 
+      loss, losses, batch_info = build_losses(pyramid, image_height, image_width, outputs, 
                       gt_boxes, gt_masks,
                       num_classes=num_classes, base_anchors=base_anchors,
                       rpn_box_lw=loss_weights[0], rpn_cls_lw=loss_weights[1],
@@ -654,22 +668,14 @@ def build(end_points, image_height, image_width, pyramid_map,
       outputs['batch_info'] = batch_info
     else:
       outputs = \
-          build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
+          build_heads(pyramid_map, end_points, image_height, image_width, num_classes, base_anchors, 
                       is_training=is_training)
 
     ### just decode outputs into readable prediction
-    pred_boxes, pred_classes, pred_masks = decode_output(outputs)
-    outputs['pred_boxes'] = pred_boxes
-    outputs['pred_classes'] = pred_classes
-    outputs['pred_masks'] = pred_masks
-
-    ### for debuging
-    outputs['tmp_0'] = pred_classes
-    outputs['tmp_1'] = pred_classes
-    outputs['tmp_2'] = pred_classes
-    outputs['tmp_3'] = pred_classes
-    outputs['tmp_4'] = pred_classes
-    outputs['tmp_5'] = pred_classes
+    # pred_boxes, pred_classes, pred_masks = decode_output(outputs)
+    # outputs['pred_boxes'] = pred_boxes
+    # outputs['pred_classes'] = pred_classes
+    # outputs['pred_masks'] = pred_masks
 
     # ### image and gt visualization
     # visualize_input(gt_boxes, end_points["input"], tf.expand_dims(gt_masks, axis=3))

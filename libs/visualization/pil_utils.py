@@ -1,9 +1,9 @@
 import numpy as np
-import tensorflow as tf
+import libs.configs.config_v1 as cfg
 from PIL import Image, ImageFont, ImageDraw, ImageEnhance
 from scipy.misc import imresize
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = cfg.FLAGS
 _DEBUG = False
 
 def draw_img(step, image, name='', image_height=1, image_width=1, rois=None):
