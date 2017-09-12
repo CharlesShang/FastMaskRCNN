@@ -1,9 +1,9 @@
 import numpy as np
-import tensorflow as tf
+import libs.configs.config_v1 as cfg
 from PIL import Image, ImageFont, ImageDraw, ImageEnhance
 from scipy.misc import imresize
 
-FLAGS = tf.app.flags.FLAGS
+FLAGS = cfg.FLAGS
 _DEBUG = False
 
 def draw_img(step, image, name='', image_height=1, image_width=1, rois=None):
@@ -36,7 +36,7 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
                             else:
                                 color = '#0000ff'  
                         else: 
-                            text = cat_id_to_cls_name(label[i]) + ' : ' + str(i)#+ str(prob[i][label[i]])[:4]
+                            text = cat_id_to_cls_name(label[i]) + ' : ' +  "{:.3f}".format(prob[i][label[i]])  #str(i)#+
                         draw.text((2+bbox[i,0], 2+bbox[i,1]), text, fill=color)
 
                         if _DEBUG is True:
@@ -52,7 +52,6 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
                             color_img = color_id_to_color_code(mask_color_id)* np.ones((bbox_h,bbox_w,1)) * 255
                             color_img = Image.fromarray(color_img.astype('uint8')).convert('RGBA')
                             #color_img = Image.new("RGBA", (bbox_w,bbox_h), np.random.rand(1,3) * 255 )
-                            # print(bbox_w, bbox_h, i, label[i], bbox.shape)
                             resized_m = imresize(m[i][label[i]], [bbox_h, bbox_w], interp='bilinear') #label[i]
                             resized_m[resized_m >= 128] = 128
                             resized_m[resized_m < 128] = 0
