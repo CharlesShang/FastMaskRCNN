@@ -25,18 +25,18 @@ _BN = True
 
 # mapping each stage to its' tensor features
 _networks_map = {
-  # 'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
-  #              'C2':'resnet_v1_50/block1/unit_2/bottleneck_v1',
-  #              'C3':'resnet_v1_50/block2/unit_3/bottleneck_v1',
-  #              'C4':'resnet_v1_50/block3/unit_5/bottleneck_v1',
-  #              'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
-  #              },
   'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
-               'C2':'resnet_v1_50/block1/unit_3/bottleneck_v1',
-               'C3':'resnet_v1_50/block2/unit_4/bottleneck_v1',
-               'C4':'resnet_v1_50/block3/unit_6/bottleneck_v1',
+               'C2':'resnet_v1_50/block1/unit_2/bottleneck_v1',
+               'C3':'resnet_v1_50/block2/unit_3/bottleneck_v1',
+               'C4':'resnet_v1_50/block3/unit_5/bottleneck_v1',
                'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
                },
+  # 'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
+  #              'C2':'resnet_v1_50/block1/unit_3/bottleneck_v1',
+  #              'C3':'resnet_v1_50/block2/unit_4/bottleneck_v1',
+  #              'C4':'resnet_v1_50/block3/unit_6/bottleneck_v1',
+  #              'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
+  #              },
   'resnet101': {'C1': '', 'C2': '',
                 'C3': '', 'C4': '',
                 'C5': '',
@@ -100,8 +100,8 @@ def _smooth_l1_dist(x, y, sigma2=9.0, name='smooth_l1_dist'):
   ------
   dist: element-wise distance, as the same shape of x, y
   """
+  deltas = x - y
   with tf.name_scope(name=name) as scope:
-    deltas = x - y
     deltas_abs = tf.abs(deltas)
     smoothL1_sign = tf.cast(tf.less(deltas_abs, 1.0 / sigma2), tf.float32)
     return tf.square(deltas) * 0.5 * sigma2 * smoothL1_sign + \
@@ -118,7 +118,7 @@ def _get_valid_sample_fraction(labels, p=0):
     return frac, frac_
 
 
-def _filter_negative_samples(labels, tensors, name='_filter_negative_samples'):
+def _filter_negative_samples(labels, tensors):
     """keeps only samples with none-negative labels 
     Params:
     -----
@@ -130,15 +130,14 @@ def _filter_negative_samples(labels, tensors, name='_filter_negative_samples'):
     tensors: filtered tensors
     """
     # return tensors
-    with tf.name_scope(name=name) as scope:
-      keeps = tf.where(tf.greater_equal(labels, 0))
-      keeps = tf.reshape(keeps, [-1])
+    keeps = tf.where(tf.greater_equal(labels, 0))
+    keeps = tf.reshape(keeps, [-1])
 
-      filtered = []
-      for t in tensors:
-          tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0])
-          f = tf.gather(t, keeps)
-          filtered.append(f)
+    filtered = []
+    for t in tensors:
+        tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0])
+        f = tf.gather(t, keeps)
+        filtered.append(f)
 
     return filtered
         
@@ -168,53 +167,54 @@ def _add_jittered_boxes(rois, scores, batch_inds, gt_boxes, jitter=0.1):
            tf.concat(values=[scores, new_scores], axis=0), \
            tf.concat(values=[batch_inds, new_batch_inds], axis=0)
 
-def build_pyramid(net_name, end_points, bilinear=True, is_training=True):
-  """build pyramid features from a typical network,
-  assume each stage is 2 time larger than its top feature
-  Returns:
-    returns several endpoints
-  """
-  pyramid = {}
-  if isinstance(net_name, str):
-    pyramid_map = _networks_map[net_name]
-  else:
-    pyramid_map = net_name
-  # pyramid['inputs'] = end_points['inputs']
-  if _BN is True:
-    # arg_scope = _extra_conv_arg_scope_with_bn()
-    arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
-  else:
-    arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
-  #
-  with tf.variable_scope('pyramid'):
-    with slim.arg_scope(arg_scope):
+# def build_pyramid(net_name, end_points, bilinear=True, is_training=True):
+#   """build pyramid features from a typical network,
+#   assume each stage is 2 time larger than its top feature
+#   Returns:
+#     returns several endpoints
+#   """
+#   pyramid = {}
+#   if isinstance(net_name, str):
+#     pyramid_map = _networks_map[net_name]
+#   else:
+#     pyramid_map = net_name
+#   # pyramid['inputs'] = end_points['inputs']
+#   if _BN is True:
+#     # arg_scope = _extra_conv_arg_scope_with_bn()
+#     arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
+#   else:
+#     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
+#   #
+#   with tf.variable_scope('pyramid'):
+#     with slim.arg_scope(arg_scope):
       
-      pyramid['P5'] = \
-        slim.conv2d(end_points[pyramid_map['C5']], 256, [1, 1], stride=1, scope='C5')
+#       pyramid['P5'] = \
+#         slim.conv2d(end_points[pyramid_map['C5']], 256, [1, 1], stride=1, scope='C5')
       
-      for c in range(4, 1, -1):
-        s, s_ = pyramid['P%d'%(c+1)], end_points[pyramid_map['C%d' % (c)]]
+#       for c in range(4, 1, -1):
+#         s, s_ = pyramid['P%d'%(c+1)], end_points[pyramid_map['C%d' % (c)]]
 
-        # s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
+#         # s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
         
-        up_shape = tf.shape(s_)
-        # out_shape = tf.stack((up_shape[1], up_shape[2]))
-        # s = slim.conv2d(s, 256, [3, 3], stride=1, scope='C%d'%c)
-        s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='C%d/upscale'%c)
-        s_ = slim.conv2d(s_, 256, [1,1], stride=1, scope='C%d'%c)
+#         up_shape = tf.shape(s_)
+#         # out_shape = tf.stack((up_shape[1], up_shape[2]))
+#         # s = slim.conv2d(s, 256, [3, 3], stride=1, scope='C%d'%c)
+#         s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='C%d/upscale'%c)
+#         s_ = slim.conv2d(s_, 256, [1,1], stride=1, scope='C%d'%c)
         
-        s = tf.add(s, s_, name='C%d/addition'%c)
-        s = slim.conv2d(s, 256, [3,3], stride=1, scope='C%d/fusion'%c)
+#         s = tf.add(s, s_, name='C%d/addition'%c)
+#         s = slim.conv2d(s, 256, [3,3], stride=1, scope='C%d/fusion'%c)
         
-        pyramid['P%d'%(c)] = s
+#         pyramid['P%d'%(c)] = s
       
-      return pyramid
+#       return pyramid
   
 def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_training=False, gt_boxes=None, bilinear=True):
   """Build the 3-way outputs, i.e., class, box and mask in the pyramid
   Algo
   ----
   For each layer:
+    0. Build pyramid features from a typical network (assume each stage is 2 time larger than its top feature)
     1. Build anchor layer
     2. Process the results of anchor layer, decode the output into rois 
     3. Sample rois 
@@ -223,9 +223,9 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
     6. Build the mask layer
     7. Build losses
   """
-  #strides = [-1, -1, 8, 16, 32, 32]
   pyramid = {}
   outputs = {}
+  outputs['rpn'] = {}
   if isinstance(net_name, str):
     pyramid_map = _networks_map[net_name]
   else:
@@ -240,34 +240,37 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
   with tf.variable_scope('pyramid'):
     with slim.arg_scope(arg_scope):
       
+        """Build pyramid (P2-P5) from convolutional layer (C2-C5) from Resnet
+        C5 160 x ?? x 256
+        C4 80 x ?? x 256
+        C3 40 x ?? x 256
+        C2 20 x ?? x 256
+        ?? is changed according to image aspect ratio
+        """
         pyramid['P5'] = \
           slim.conv2d(end_points[pyramid_map['C5']], 256, [1, 1], stride=1, activation_fn=None, scope='C5')
-        
         for c in range(4, 1, -1):
           s, s_ = pyramid['P%d'%(c+1)], end_points[pyramid_map['C%d' % (c)]]
-
-          # s_ = slim.conv2d(s_, 256, [3, 3], stride=1, scope='C%d'%c)
-          
           up_shape = tf.shape(s_)
-          # out_shape = tf.stack((up_shape[1], up_shape[2]))
-          # s = slim.conv2d(s, 256, [3, 3], stride=1, scope='C%d'%c)
           s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='C%d/upscale'%c)
           s_ = slim.conv2d(s_, 256, [1,1], stride=1, activation_fn=None, scope='C%d'%c)
-          
           s = tf.add(s, s_, name='C%d/addition'%c)
           s = slim.conv2d(s, 256, [3,3], stride=1, activation_fn=None, scope='C%d/fusion'%c)
           
           pyramid['P%d'%(c)] = s
 
-          ### for p in pyramid
-          outputs['rpn'] = {}
-
-
+        """Build RPN head
+        RPN takes features from pyramid network. 
+        strides are respectively set to [4, 8, 16, 32] for pyramid feature layer P2,P3,P4,P5 
+        anchor_scales are set to [2, 4, 8, 16, 32] in all pyramid layers (*This is probably inconsistent with original paper where the only scale is 8)
+        It generates 2 outputs.
+        box: an array of shape (1, pyramid_height, pyramid_width, num_anchorx4). box regression values [shift_x, shift_y, scale_width, scale_height] are stored in the last dimension of the array.
+        cls: an array of shape (1, pyramid_height, pyramid_width, num_anchorx2). Note that this value is before softmax   
+        """
         for i in range(5, 1, -1):
           p = 'P%d'%i
-          stride = min(2*(2**i), 32)#strides[i]#2 ** i
+          stride = 2**i 
 
-          ### rpn head
           shape = tf.shape(pyramid[p])
           height, width = shape[1], shape[2]
           rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, scope='%s/rpn'%p)
@@ -277,22 +280,10 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.01), activation_fn=None, normalizer_fn=None)
 
           anchor_scales = [2, 4, 8, 16, 32]#[2 **(i-2), 2 ** (i-1), 2 **(i)] #
-          print("anchor_scales = " , anchor_scales)
           all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
-          # if i == 5:
-          #   outputs['tmp_5'] = all_anchors
-          # elif i == 4:
-          #   outputs['tmp_4'] = all_anchors
-          # elif i == 3:
-          #   outputs['tmp_3'] = all_anchors
-          # elif i == 2:
-          #   outputs['tmp_2'] = all_anchors
-          #   outputs['tmp_1'] = width
-          #   outputs['tmp_0'] = height
-
           outputs['rpn'][p]={'box':box, 'cls':cls, 'anchor':all_anchors}
 
-        ### gather all rois
+        ### gather boxes, clses, anchors from all pyramid layers
         rpn_boxes = [tf.reshape(outputs['rpn']['P%d'%p]['box'], [-1, 4]) for p in range(5, 1, -1)]  
         rpn_clses = [tf.reshape(outputs['rpn']['P%d'%p]['cls'], [-1, 1]) for p in range(5, 1, -1)]  
         rpn_anchors = [tf.reshape(outputs['rpn']['P%d'%p]['anchor'], [-1, 4]) for p in range(5, 1, -1)]  
@@ -300,8 +291,8 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
         rpn_clses = tf.concat(values=rpn_clses, axis=0)
         rpn_anchors = tf.concat(values=rpn_anchors, axis=0)
         
-        rpn_probs = tf.nn.softmax(tf.reshape(rpn_clses, [-1, 2]))
-        rpn_final_boxes, rpn_final_clses, rpn_final_scores = anchor_decoder(rpn_boxes, rpn_probs, rpn_anchors, ih, iw)
+        rpn_probs = tf.nn.softmax(tf.reshape(rpn_clses, [-1, 2])) ### softmax to get probability
+        rpn_final_boxes, rpn_final_clses, rpn_final_scores = anchor_decoder(rpn_boxes, rpn_probs, rpn_anchors, ih, iw) ### decode anchors and box regression values into proposed bounding boxes 
 
         outputs['rpn_boxes'] = rpn_boxes
         outputs['rpn_clses'] = rpn_clses
@@ -311,18 +302,18 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
         outputs['rpn_final_scores'] = rpn_final_scores
 
         if is_training is True:
-          ### for training, rcnn and maskrcnn take rpn boxes as inputs
+          ### for training, rcnn and maskrcnn take rpn proposed bounding boxes as inputs
           rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn, rpn_rois_to_mask, rpn_scores_to_mask, rpn_batch_inds_to_mask = \
                 sample_rpn_outputs_with_gt(rpn_final_boxes, rpn_final_scores, gt_boxes, is_training=is_training, only_positive=False)
         else:
           ### for testing, only rcnn takes rpn boxes as inputs. maskrcnn takes rcnn boxes as inputs
           rpn_rois_to_rcnn, rpn_scores_to_rcnn, rpn_batch_inds_to_rcnn = sample_rpn_outputs(rpn_final_boxes, rpn_final_scores, only_positive=False)
 
-        ### assign pyramid layer indexs to rcnn network's ROIs
+        ### assign pyramid layer indexs to rcnn network's ROIs.   
         [rcnn_assigned_rois, rcnn_assigned_batch_inds, rcnn_assigned_layer_inds] = \
                 assign_boxes(rpn_rois_to_rcnn, [rpn_rois_to_rcnn, rpn_batch_inds_to_rcnn], [2, 3, 4, 5])
 
-        ### crop features from pyramid for rcnn network
+        ### crop features from pyramid using ROIs. Note that this will change order of the ROIs, so ROIs are also reordered.
         rcnn_cropped_features = []
         rcnn_ordered_rois = []
         for i in range(5, 1, -1):
@@ -337,9 +328,11 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
         rcnn_cropped_features = tf.concat(values=rcnn_cropped_features, axis=0)
         rcnn_ordered_rois = tf.concat(values=rcnn_ordered_rois, axis=0)
 
-        ### rcnn head
-        # to 7 x 7
-        #rcnn = slim.max_pool2d(rcnn_cropped_features, [2, 2], stride=2, padding='SAME')
+        """Build rcnn head
+        rcnn takes cropped features and generates 2 outputs. 
+        rcnn_boxes: an array of shape (num_ROIs, num_classes x 4). Box regression values of each classes [shift_x, shift_y, scale_width, scale_height] are stored in the last dimension of the array.
+        rcnn_clses: an array of shape (num_ROIs, num_classes). Class prediction values (before softmax) are stored
+        """
         rcnn = slim.flatten(rcnn_cropped_features)
         rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         #rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=True)#is_training
@@ -349,10 +342,10 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
                 weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         rcnn_boxes = slim.fully_connected(rcnn, num_classes*4, activation_fn=None, normalizer_fn=None, 
                 weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
-        rcnn_scores = tf.nn.softmax(rcnn_clses)
+        rcnn_scores = tf.nn.softmax(rcnn_clses)### softmax to get probability
 
         ### decode rcnn network final outputs
-        rcnn_final_boxes, rcnn_final_classes, rcnn_final_scores = roi_decoder(rcnn_boxes, rcnn_scores, rcnn_ordered_rois, ih, iw)
+        rcnn_final_boxes, rcnn_final_classes, rcnn_final_scores = roi_decoder(rcnn_boxes, rcnn_scores, rcnn_ordered_rois, ih, iw)  ### decode ROIs and box regression values into bounding boxes 
 
         outputs['rcnn_ordered_rois'] = rcnn_ordered_rois
         outputs['rcnn_cropped_features'] = rcnn_cropped_features
@@ -364,14 +357,15 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
         outputs['rcnn_final_clses'] = rcnn_final_classes
         outputs['rcnn_final_scores'] = rcnn_final_scores
         
-        ### assign pyramid layer indexs to mask network's ROIs
+       
         if is_training:
+          ### assign pyramid layer indexs to mask network's ROIs
           [mask_assigned_rois, mask_assigned_batch_inds, mask_assigned_layer_inds] = \
                assign_boxes(rpn_rois_to_mask, [rpn_rois_to_mask, rpn_batch_inds_to_mask], [2, 3, 4, 5])
 
+          ### crop features from pyramid using ROIs. Again, this will change order of the ROIs, so ROIs are reordered.
           mask_cropped_features = []
           mask_ordered_rois = []
-          ### crop features from pyramid for mask network
           for i in range(5, 1, -1):
               p = 'P%d'%i
               mask_splitted_roi = mask_assigned_rois[i-2]
@@ -383,7 +377,6 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
               
           mask_cropped_features = tf.concat(values=mask_cropped_features, axis=0)
           mask_ordered_rois = tf.concat(values=mask_ordered_rois, axis=0)
-
         else:
           ### for testing, mask network takes rcnn boxes as inputs
           rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores) 
@@ -415,11 +408,13 @@ def build_heads(net_name, end_points, ih, iw, num_classes, base_anchors, is_trai
           outputs['mask_final_clses'] = mask_ordered_clses
           outputs['mask_final_scores'] = mask_ordered_scores
 
-        ### mask head
+        """Build mask rcnn head
+        mask rcnn takes cropped features and generates masks for each classes. 
+        m: an array of shape (28, 28, num_classes). Note that this value is before sigmoid.
+        """
         m = mask_cropped_features
         for _ in range(4):
             m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu)
-        # to 28 x 28
         m = slim.conv2d_transpose(m, 256, 2, stride=2, padding='VALID', activation_fn=tf.nn.relu)
         tf.add_to_collection('__TRANSPOSED__', m)
         m = slim.conv2d(m, num_classes, [1, 1], stride=1, padding='VALID', activation_fn=None, normalizer_fn=None)
@@ -463,8 +458,6 @@ def build_losses(pyramid, ih, iw, outputs, gt_boxes, gt_masks,
   rcnn_batch_pos = []
   mask_batch_pos = []
 
-  strides = [-1, -1, 8, 16, 32, 32]
-
   if _BN is True:
     # arg_scope = _extra_conv_arg_scope_with_bn()
     arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
@@ -479,7 +472,7 @@ def build_losses(pyramid, ih, iw, outputs, gt_boxes, gt_masks,
         ## build losses for PFN
         for i in range(5, 1, -1):
             p = 'P%d' % i
-            stride = stride = min(2*(2**i), 32)#strides[i]#2 ** i
+            stride = (2 ** i)#min(2*(2**i), 32)#strides[i]#2 ** i
             shape = tf.shape(pyramid[p])
             height, width = shape[1], shape[2]
 
@@ -488,8 +481,6 @@ def build_losses(pyramid, ih, iw, outputs, gt_boxes, gt_masks,
             ### rpn losses
             # 1. encode ground truth
             # 2. compute distances
-            # anchor_scales = [2 **(i-2), 2 ** (i-1), 2 **(i)]
-            # all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
             all_anchors = outputs['rpn'][p]['anchor']
             rpn_boxes = outputs['rpn'][p]['box']
             rpn_clses = tf.reshape(outputs['rpn'][p]['cls'], (1, height, width, base_anchors, 2))
@@ -667,7 +658,7 @@ def build(end_points, image_height, image_width, pyramid_map,
       outputs['total_loss'] = loss
       outputs['batch_info'] = batch_info
     else:
-      outputs = \
+      pyramid, outputs = \
           build_heads(pyramid_map, end_points, image_height, image_width, num_classes, base_anchors, 
                       is_training=is_training)
 

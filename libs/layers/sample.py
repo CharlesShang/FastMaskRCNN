@@ -76,13 +76,13 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False, wi
   if with_nms is True:
     det = np.hstack((boxes, scores)).astype(np.float32)
     keeps = nms_wrapper.nms(det, rpn_nms_threshold)
+    boxes = boxes[keeps, :]
+    scores = scores[keeps].astype(np.float32)
 
   ## filter after nms
   if post_nms_top_n > 0:
-    keeps = keeps[:post_nms_top_n]
-
-  boxes = boxes[keeps, :]
-  scores = scores[keeps].astype(np.float32)
+    boxes = boxes[:post_nms_top_n, :]
+    scores = scores[:post_nms_top_n]  
 
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 

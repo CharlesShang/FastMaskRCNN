@@ -27,6 +27,22 @@ def anchors_plane(height, width, stride = 1.0,
   all_anchors = cython_anchor.anchors_plane(height, width, stride, anc).astype(np.float32)
   return all_anchors
 
+def jitter_gt_boxes(gt_boxes, jitter=0.05):
+  """ jitter the gtboxes, before adding them into rois, to be more robust for cls and rgs
+  gt_boxes: (G, 5) [x1 ,y1 ,x2, y2, class] int
+  """
+  jittered_boxes = gt_boxes.copy()
+  ws = jittered_boxes[:, 2] - jittered_boxes[:, 0] + 1.0
+  hs = jittered_boxes[:, 3] - jittered_boxes[:, 1] + 1.0
+  width_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * ws
+  height_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * hs
+  jittered_boxes[:, 0] += width_offset
+  jittered_boxes[:, 2] += width_offset
+  jittered_boxes[:, 1] += height_offset
+  jittered_boxes[:, 3] += height_offset
+
+  return jittered_boxes
+
 # Written by Ross Girshick and Sean Bell
 def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
                      scales=2 ** np.arange(3, 6)):
@@ -76,8 +92,8 @@ def _ratio_enum(anchor, ratios):
   w, h, x_ctr, y_ctr = _whctrs(anchor)
   size = w * h
   size_ratios = size / ratios
-  ws = (np.sqrt(size_ratios))
-  hs = (ws * ratios)#np.round
+  ws = np.round(np.sqrt(size_ratios))
+  hs = np.round(ws * ratios)
   anchors = _mkanchors(ws, hs, x_ctr, y_ctr)
   return anchors
 
@@ -106,22 +122,6 @@ def _unmap(data, count, inds, fill=0):
     ret[inds, :] = data
   return ret
 
-def _jitter_gt_boxes(gt_boxes, jitter=0.05):
-    """ jitter the gtboxes, before adding them into rois, to be more robust for cls and rgs
-    gt_boxes: (G, 5) [x1 ,y1 ,x2, y2, class] int
-    """
-    jittered_boxes = gt_boxes.copy()
-    ws = jittered_boxes[:, 2] - jittered_boxes[:, 0] + 1.0
-    hs = jittered_boxes[:, 3] - jittered_boxes[:, 1] + 1.0
-    width_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * ws
-    height_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * hs
-    jittered_boxes[:, 0] += width_offset
-    jittered_boxes[:, 2] += width_offset
-    jittered_boxes[:, 1] += height_offset
-    jittered_boxes[:, 3] += height_offset
-
-    return jittered_boxes
-
 if __name__ == '__main__':
   import time
   
@@ -140,7 +140,7 @@ if __name__ == '__main__':
   #              [ 472.08267212,  378.50143433,  814.7980957,   562.92962646], 
   #              [3.15492964,  491.46292114,  957.62628174,  630.52020264]])
 
-  jittered_gt_boxes = _jitter_gt_boxes(gt_boxes[:, :4])
+  jittered_gt_boxes = jitter_gt_boxes(gt_boxes[:, :4])
   clipped_gt_boxes = clip_boxes(jittered_gt_boxes, (ih, iw))
 
   ancs = anchors()

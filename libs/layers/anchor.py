@@ -7,7 +7,7 @@ import numpy as np
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
-from libs.boxes.anchor import anchors_plane
+from libs.boxes.anchor import anchors_plane, jitter_gt_boxes
 from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
@@ -52,7 +52,7 @@ def encode(gt_boxes, all_anchors, height, width, stride, ih, iw, ignore_cross_bo
     labels = np.empty((anchors.shape[0], ), dtype=np.int32)
     labels.fill(-1)
 
-    jittered_gt_boxes = _jitter_gt_boxes(gt_boxes[:, :4])
+    jittered_gt_boxes = jitter_gt_boxes(gt_boxes[:, :4])
     clipped_gt_boxes = clip_boxes(jittered_gt_boxes, (ih, iw))
 
     if gt_boxes.size > 0:
@@ -265,19 +265,3 @@ if __name__ == '__main__':
     #     # anchors, _, _ = anchors_plane(200, 300, stride=4, boarder=0)
   
     # print('average time: %f' % ((time.time() - t)/10.0))
-
-def _jitter_gt_boxes(gt_boxes, jitter=0.05):
-    """ jitter the gtboxes, before adding them into rois, to be more robust for cls and rgs
-    gt_boxes: (G, 5) [x1 ,y1 ,x2, y2, class] int
-    """
-    jittered_boxes = gt_boxes.copy()
-    ws = jittered_boxes[:, 2] - jittered_boxes[:, 0] + 1.0
-    hs = jittered_boxes[:, 3] - jittered_boxes[:, 1] + 1.0
-    width_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * ws
-    height_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * hs
-    jittered_boxes[:, 0] += width_offset
-    jittered_boxes[:, 2] += width_offset
-    jittered_boxes[:, 1] += height_offset
-    jittered_boxes[:, 3] += height_offset
-
-    return jittered_boxes

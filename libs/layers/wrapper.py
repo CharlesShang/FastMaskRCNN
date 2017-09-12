@@ -171,7 +171,7 @@ def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
         for t in tensors:
             split_tensors = []
             for l in layers:
-                # tf.cast(l, tf.int32)
+                tf.cast(l, tf.int32)
                 inds = tf.where(tf.equal(assigned_layers, l))
                 inds = tf.reshape(inds, [-1])
                 split_tensors.append(tf.gather(t, inds))

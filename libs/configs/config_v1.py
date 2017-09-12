@@ -272,11 +272,11 @@ tf.app.flags.DEFINE_integer(
 ##################################
 
 tf.app.flags.DEFINE_integer(
-    'pre_nms_top_n', 200,#12000,
+    'pre_nms_top_n', 12000,#12000,
     'Number of rpn anchors that should be sampled before nms')
 
 tf.app.flags.DEFINE_integer(
-    'post_nms_top_n', 10, #2000
+    'post_nms_top_n', 2000, #2000
     'Number of rpn anchors that should be sampled after nms')
 
 tf.app.flags.DEFINE_integer(

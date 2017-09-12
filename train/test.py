@@ -121,7 +121,7 @@ def test():
             weight_decay=FLAGS.weight_decay, is_training=True)
     outputs = pyramid_network.build(end_points, im_shape[1], im_shape[2], pyramid_map,
             num_classes=81,
-            base_anchors=9,#15
+            base_anchors=15,#15
             is_training=False,
             gt_boxes=None, gt_masks=None, loss_weights=[0.0, 0.0, 0.0, 0.0, 0.0])
 
@@ -133,12 +133,12 @@ def test():
     testing_mask_final_scores = outputs['mask_final_scores']
 
     #############################
-    tmp_0 = outputs['tmp_0']
-    tmp_1 = outputs['tmp_1']
-    tmp_2 = outputs['tmp_2']
-    tmp_3 = outputs['tmp_3']
-    tmp_4 = outputs['tmp_4']
-    tmp_5 = outputs['tmp_5']
+    # tmp_0 = outputs['tmp_0']
+    # tmp_1 = outputs['tmp_1']
+    # tmp_2 = outputs['tmp_2']
+    # tmp_3 = outputs['tmp_3']
+    # tmp_4 = outputs['tmp_4']
+    # tmp_5 = outputs['tmp_5']
     ############################
 
 
@@ -181,11 +181,11 @@ def test():
 
         img_id_str, img_h, img_w, new_img_h, new_img_w, \
         gt_boxesnp, gt_masksnp,\
-        input_imagenp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np, tmp_5np, \
+        input_imagenp, \
         testing_mask_roisnp, testing_mask_final_masknp, testing_mask_final_clsesnp, testing_mask_final_scoresnp = \
                      sess.run([img_id] + [ih] + [iw] + [new_ih] + [new_iw] +\
                               [gt_boxes] + [gt_masks] +\
-                              [input_image] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4] + [tmp_5] + \
+                              [input_image] + \
                               [testing_mask_rois] + [testing_mask_final_mask] + [testing_mask_final_clses] + [testing_mask_final_scores])
 
         duration_time = time.time() - start_time

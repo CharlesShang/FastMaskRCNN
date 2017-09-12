@@ -63,8 +63,8 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
 
         gt_height = gt_masks.shape[1]
         gt_width = gt_masks.shape[2]
-        enlarged_width = mask_width*5
-        enlarged_height = mask_height*5
+        enlarged_width = mask_width*20.0
+        enlarged_height = mask_height*20.0
 
         roi = rois[i, :4]
         cropped = gt_masks[gt_assignment[i], :, :]
@@ -76,8 +76,6 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
 
         mask_targets[i, :, :, labels[i]] = cropped
         mask_inside_weights[i, :, :, labels[i]] = 1.0
-
-
 
       mask_rois = rois[:, :4]
   else:
