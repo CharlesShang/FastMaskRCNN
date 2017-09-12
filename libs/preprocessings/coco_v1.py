@@ -98,4 +98,4 @@ def preprocess_for_test(image, gt_boxes, gt_masks):
     ## rgb to bgr
     image = tf.reverse(image, axis=[-1])
 
-    return image, new_ih, new_iw, gt_boxes, gt_masks
+    return image, new_ih, new_iw, gt_boxes, gt_masks 

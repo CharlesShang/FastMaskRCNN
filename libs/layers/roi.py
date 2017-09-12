@@ -13,7 +13,7 @@ from libs.logs.log import LOG
 
 _DEBUG = False 
 
-def encode(gt_boxes, rois, num_classes):
+def encode(gt_boxes, rois, num_classes, indexs):
   """Matching and Encoding groundtruth boxes (gt_boxes) into learning targets to boxes
   Sampling
   Parameters
@@ -35,7 +35,7 @@ def encode(gt_boxes, rois, num_classes):
       # R x G matrix
       overlaps = cython_bbox.bbox_overlaps(
         np.ascontiguousarray(all_rois[:, 0:4], dtype=np.float),
-        np.ascontiguousarray(gt_boxes[:, 0:4], dtype=np.float))
+        np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
       gt_assignment = overlaps.argmax(axis=1)  # R
       # max_overlaps = overlaps.max(axis=1)      # R
       max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
@@ -97,7 +97,7 @@ def encode(gt_boxes, rois, num_classes):
           labels[ignore_inds] = -1 
       max_overlaps = labels
 
-  return labels, bbox_targets, bbox_inside_weights
+  return labels, bbox_targets, bbox_inside_weights, max_overlaps.astype(np.float32), indexs
 
 def decode(boxes, scores, rois, ih, iw):
   """Decode prediction targets into boxes and only keep only one boxes of greatest possibility for each rois
@@ -149,7 +149,7 @@ def _compute_targets(ex_rois, gt_rois, labels, num_classes):
     start = 4 * cls
     end = start + 4
     bbox_targets[ind, start:end] = targets[ind, 0:4]
-    bbox_inside_weights[ind, start:end] = 1.0
+    bbox_inside_weights[ind, start:end] = 1
   return bbox_targets, bbox_inside_weights
 
 def _unmap(data, count, inds, fill=0):

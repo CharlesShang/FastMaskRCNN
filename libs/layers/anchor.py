@@ -7,13 +7,13 @@ import numpy as np
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
-from libs.boxes.anchor import anchors_plane, jitter_gt_boxes
+from libs.boxes.anchor import anchors_plane
 from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
 _DEBUG = False
 
-def encode(gt_boxes, all_anchors, height, width, stride, ih, iw, ignore_cross_boundary=True):
+def encode(gt_boxes, all_anchors, height, width, stride, indexs):
     """Matching and Encoding groundtruth into learning targets
     Sampling
     
@@ -52,45 +52,64 @@ def encode(gt_boxes, all_anchors, height, width, stride, ih, iw, ignore_cross_bo
     labels = np.empty((anchors.shape[0], ), dtype=np.int32)
     labels.fill(-1)
 
-    jittered_gt_boxes = jitter_gt_boxes(gt_boxes[:, :4])
-    clipped_gt_boxes = clip_boxes(jittered_gt_boxes, (ih, iw))
-
     if gt_boxes.size > 0:
         overlaps = cython_bbox.bbox_overlaps(
                    np.ascontiguousarray(anchors, dtype=np.float),
-                   np.ascontiguousarray(clipped_gt_boxes, dtype=np.float))
+                   np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
 
-        gt_assignment = overlaps.argmax(axis=1)  # (A)  
+        # if _DEBUG:
+        #     print ('gt_boxes shape: ', gt_boxes.shape)
+        #     print ('anchors shape: ', anchors.shape)
+        #     print ('overlaps shape: ', overlaps.shape)
+
+
+        gt_assignment = overlaps.argmax(axis=1)  # (A)
         max_overlaps = overlaps[np.arange(total_anchors), gt_assignment]
         gt_argmax_overlaps = overlaps.argmax(axis=0)  # G
         gt_max_overlaps = overlaps[gt_argmax_overlaps,
                                    np.arange(overlaps.shape[1])]
+
+        labels[max_overlaps < cfg.FLAGS.rpn_bg_threshold] = 0
+
+        if _DEBUG:
+            print ('gt_assignment shape: ', gt_assignment.shape)
+            print ('max_overlaps shape: ', max_overlaps.shape)
+            print ('gt_argmax_overlaps shape: ', gt_argmax_overlaps.shape)
+            print ('gt_max_overlaps shape: ', gt_max_overlaps.shape)
         
+        if True:
+            # this is sentive to boxes of little overlaps, no need!
+            # gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
 
+            # fg label: for each gt, hard-assign anchor with highest overlap despite its overlaps
+            labels[gt_argmax_overlaps] = 1
 
-        # bg label: less than threshold IOU
-        labels[max_overlaps < cfg.FLAGS.rpn_bg_threshold] = 0    
-        # fg label: above threshold IOU 
+            # exclude examples with little overlaps
+            # added later
+            # excludes = np.where(gt_max_overlaps < cfg.FLAGS.bg_threshold)[0]
+            # labels[gt_argmax_overlaps[excludes]] = -1
+
+            # if _DEBUG:
+            #    min_ov = np.min(gt_max_overlaps)
+            #    max_ov = np.max(gt_max_overlaps)
+            #    mean_ov = np.mean(gt_max_overlaps)
+            #    if min_ov < cfg.FLAGS.bg_threshold:
+            #        LOG('ANCHOREncoder: overlaps: (min %.3f mean:%.3f max:%.3f), stride: %d, shape:(h:%d, w:%d)' 
+            #                % (min_ov, mean_ov, max_ov, stride, height, width))
+            #        worst = gt_boxes[np.argmin(gt_max_overlaps)]
+            #        anc = anchors[gt_argmax_overlaps[np.argmin(gt_max_overlaps)], :]
+            #        LOG('ANCHOREncoder: worst case: overlap: %.3f, box:(%.1f, %.1f, %.1f, %.1f %d), anchor:(%.1f, %.1f, %.1f, %.1f)'
+            #                % (min_ov, worst[0], worst[1], worst[2], worst[3], worst[4],
+            #                   anc[0], anc[1], anc[2], anc[3]))
+             
+
+        # fg label: above threshold IOU
         labels[max_overlaps >= cfg.FLAGS.rpn_fg_threshold] = 1
-        # LOG ("all_anchors anchor above threshold\n%s" %all_anchors[labels==1, :])
 
-        # ignore cross-boundary anchors
-        if ignore_cross_boundary is True:
-            cb0_inds = np.where(all_anchors[:, 0] <= 0  - (all_anchors[:, 2] - all_anchors[:, 0]) * cfg.FLAGS.allow_border)
-            cb1_inds = np.where(all_anchors[:, 1] <= 0  - (all_anchors[:, 3] - all_anchors[:, 1]) * cfg.FLAGS.allow_border)
-            cb2_inds = np.where(all_anchors[:, 2] >= iw + (all_anchors[:, 2] - all_anchors[:, 0]) * cfg.FLAGS.allow_border)
-            cb3_inds = np.where(all_anchors[:, 3] >= ih + (all_anchors[:, 3] - all_anchors[:, 1]) * cfg.FLAGS.allow_border)
-            cb_inds = np.unique(np.concatenate((cb0_inds, cb1_inds, cb2_inds, cb3_inds), axis =1))
-            labels[cb_inds] = -1
-            #LOG ("stride: %d total anchor: %d\tremained anchor: %d\t ih:%d iw:%d min size %d %d \t max size %d %d" % (stride, total_anchors, total_anchors-len(cb_inds), ih, iw, np.min(all_anchors[:, 0]), np.min(all_anchors[:, 1]), np.max(all_anchors[:, 2]), np.max(all_anchors[:, 3])))
-        # LOG ("above threshold: %s"% np.where(labels==1)) 
-        gt_argmax_overlaps = np.where(overlaps == gt_max_overlaps)[0]
-        labels[gt_argmax_overlaps] = 1
-        
-        # LOG ("all_anchors anchor closest box\n%s" %all_anchors[labels==2, :])
-        # LOG ("gt anchor\n%s" %gt_boxes)
-        # LOG ("closest box: %s"% np.where(labels==2))
-        # LOG ("stride: %d total anchor: %d\tremained anchor: %d\t ih:%d iw:%d min size %d %d \t max size %d %d" % (stride, total_anchors, total_anchors-len(cb_inds), ih, iw, np.min(all_anchors[labels!=-2, 0]), np.min(all_anchors[labels!=-2, 1]), np.max(all_anchors[labels!=-2, 2]), np.max(all_anchors[labels!=-2, 3])))
+        if _DEBUG:
+            print('highest cover :', gt_max_overlaps.shape)
+            print('more than 0.7 :', len(max_overlaps >= cfg.FLAGS.rpn_fg_threshold))
+            print('labels is 1   :', len(labels == 1))
 
         # subsample positive labels if there are too many
         num_fg = int(cfg.FLAGS.fg_rpn_fraction * cfg.FLAGS.rpn_batch_size)
@@ -105,7 +124,7 @@ def encode(gt_boxes, all_anchors, height, width, stride, ih, iw, ignore_cross_bo
     # TODO: mild hard negative mining
     # subsample negative labels if there are too many
     num_fg = np.sum(labels == 1)
-    num_bg = max(min(cfg.FLAGS.rpn_batch_size - num_fg, num_fg * 3), 2)
+    num_bg = max(min(cfg.FLAGS.rpn_batch_size - num_fg, num_fg * 3), 8)
     bg_inds = np.where(labels == 0)[0]
     if len(bg_inds) > num_bg:
         disable_inds = np.random.choice(bg_inds, size=(len(bg_inds) - num_bg), replace=False)
@@ -123,10 +142,11 @@ def encode(gt_boxes, all_anchors, height, width, stride, ih, iw, ignore_cross_bo
     # bbox_inside_weights = _unmap(bbox_inside_weights, total_anchors, inds_inside, fill=0)
 
     labels = labels.reshape((1, height, width, -1))
+    indexs = indexs.reshape((1, height, width, -1))
     bbox_targets = bbox_targets.reshape((1, height, width, -1))
     bbox_inside_weights = bbox_inside_weights.reshape((1, height, width, -1))
 
-    return labels, bbox_targets, bbox_inside_weights
+    return labels, bbox_targets, bbox_inside_weights, indexs
 
 def decode(boxes, scores, all_anchors, ih, iw):
     """Decode outputs into boxes
@@ -151,6 +171,7 @@ def decode(boxes, scores, all_anchors, ih, iw):
     scores = scores.reshape((-1, 2))
     assert scores.shape[0] == boxes.shape[0] == all_anchors.shape[0], \
       'Anchor layer shape error %d vs %d vs %d' % (scores.shape[0],boxes.shape[0],all_anchors.reshape[0])
+    index = np.arange(scores.shape[0]).astype(np.int32)
     boxes = bbox_transform_inv(all_anchors, boxes)
     classes = np.argmax(scores, axis=1)
     scores = scores[:, 1]
@@ -158,7 +179,7 @@ def decode(boxes, scores, all_anchors, ih, iw):
     final_boxes = clip_boxes(final_boxes, (ih, iw))
     classes = classes.astype(np.int32)
 
-    return final_boxes, classes, scores
+    return final_boxes, classes, scores, index
 
 def sample(boxes, scores, ih, iw, is_training):
     """
@@ -208,60 +229,34 @@ if __name__ == '__main__':
     import time
     t = time.time()
     
-    cfg.FLAGS.fg_threshold = 0.5
-    # classes = np.ones((2,1))#random.randint(1, 1, (2, 1))
-    # boxes = np.random.randint(10, 50, (2, 2))
-    # s = np.random.randint(20, 50, (2, 2))
-    # s = boxes + s
-    # boxes = np.concatenate((boxes, s), axis=1)
-    # gt_boxes = np.hstack((boxes, classes))
-    # print(gt_boxes)
+    for i in range(10):
+        cfg.FLAGS.fg_threshold = 0.1
+        classes = np.random.randint(0, 1, (50, 1))
+        boxes = np.random.randint(10, 50, (50, 2))
+        s = np.random.randint(20, 50, (50, 2))
+        s = boxes + s
+        boxes = np.concatenate((boxes, s), axis=1)
+        gt_boxes = np.hstack((boxes, classes))
+        # gt_boxes = boxes
 
-    gt_boxes = np.array([[0, 0, 5, 5],[6, 6, 8, 8]])
-    print(gt_boxes)
-    anchors = np.array([[-10,-10, 5, 5],[6, 6, 8, 8]])
-    print(anchors)
-    overlaps = cython_bbox.bbox_overlaps(
-                   np.ascontiguousarray(anchors, dtype=np.float),
-                   np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
-    print(overlaps)
+        N = 100
+        rois = np.random.randint(10, 50, (N, 2))
+        s = np.random.randint(0, 20, (N, 2))
+        s = rois + s
+        rois = np.concatenate((rois, s), axis=1)
+        indexs = np.arange(N)
 
-    # all_anchors = anchors_plane(25, 37, stride = 32, scales=[8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
-    # print(all_anchors)
-    # print(all_anchors.shape)
-    # all_anchors = all_anchors.reshape([-1, 4])
+        all_anchors = anchors_plane(200, 300, stride = 4, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=200, width=300, stride=4, indexs=indexs)
 
-    # for i in range(10):
-    #     cfg.FLAGS.fg_threshold = 0.5
-    #     classes = np.random.randint(0, 1, (50, 1))
-    #     boxes = np.random.randint(10, 50, (50, 2))
-    #     s = np.random.randint(20, 50, (50, 2))
-    #     s = boxes + s
-    #     boxes = np.concatenate((boxes, s), axis=1)
-    #     gt_boxes = np.hstack((boxes, classes))
-    #     # gt_boxes = boxes
+        all_anchors = anchors_plane(100, 150, stride = 8, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=100, width=150, stride=8, indexs=indexs)
 
-    #     N = 100
-    #     rois = np.random.randint(10, 50, (N, 2))
-    #     s = np.random.randint(0, 20, (N, 2))
-    #     s = rois + s
-    #     rois = np.concatenate((rois, s), axis=1)
-        
-    #     indexs = np.arange(5*3*200*300)
-    #     all_anchors = anchors_plane(200, 300, stride = 4, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
-    #     labels, bbox_targets, bbox_inside_weights, indexs = encode(gt_boxes, all_anchors=all_anchors, height=200, width=300, stride=4, indexs=indexs)
+        all_anchors = anchors_plane(50, 75, stride = 16, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=50, width=75, stride=16, indexs=indexs)
 
-    #     indexs = np.arange(5*3*100*150)
-    #     all_anchors = anchors_plane(100, 150, stride = 8, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
-    #     labels, bbox_targets, bbox_inside_weights, indexs  = encode(gt_boxes, all_anchors=all_anchors, height=100, width=150, stride=8, indexs=indexs)
-
-    #     indexs = np.arange(5*3*50*75)
-    #     all_anchors = anchors_plane(50, 75, stride = 16, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
-    #     labels, bbox_targets, bbox_inside_weights, indexs  = encode(gt_boxes, all_anchors=all_anchors, height=50, width=75, stride=16, indexs=indexs)
-
-    #     indexs = np.arange(5*3*25*37)
-    #     all_anchors = anchors_plane(25, 37, stride = 32, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
-    #     labels, bbox_targets, bbox_inside_weights, indexs  = encode(gt_boxes, all_anchors=all_anchors, height=25, width=37, stride=32, indexs=indexs)
-    #     # anchors, _, _ = anchors_plane(200, 300, stride=4, boarder=0)
+        all_anchors = anchors_plane(25, 37, stride = 32, scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16)
+        labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=all_anchors, height=25, width=37, stride=32, indexs=indexs)
+        # anchors, _, _ = anchors_plane(200, 300, stride=4, boarder=0)
   
-    # print('average time: %f' % ((time.time() - t)/10.0))
+    print('average time: %f' % ((time.time() - t)/10.0))

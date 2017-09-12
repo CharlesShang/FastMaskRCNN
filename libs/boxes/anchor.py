@@ -4,9 +4,6 @@ from __future__ import print_function
 
 import numpy as np
 from libs.boxes import cython_anchor
-from libs.logs.log import LOG
-from libs.boxes import cython_bbox
-from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 
 def anchors(scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16):
   """Get a set of anchors at one position """
@@ -24,24 +21,8 @@ def anchors_plane(height, width, stride = 1.0,
   # ratios = kwargs.setdefault('ratios', [0.5, 1, 2.0])
   # base = kwargs.setdefault('base', 16)
   anc = anchors(scales, ratios, base)
-  all_anchors = cython_anchor.anchors_plane(height, width, stride, anc).astype(np.float32)
+  all_anchors = cython_anchor.anchors_plane(height, width, stride, anc)
   return all_anchors
-
-def jitter_gt_boxes(gt_boxes, jitter=0.05):
-  """ jitter the gtboxes, before adding them into rois, to be more robust for cls and rgs
-  gt_boxes: (G, 5) [x1 ,y1 ,x2, y2, class] int
-  """
-  jittered_boxes = gt_boxes.copy()
-  ws = jittered_boxes[:, 2] - jittered_boxes[:, 0] + 1.0
-  hs = jittered_boxes[:, 3] - jittered_boxes[:, 1] + 1.0
-  width_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * ws
-  height_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * hs
-  jittered_boxes[:, 0] += width_offset
-  jittered_boxes[:, 2] += width_offset
-  jittered_boxes[:, 1] += height_offset
-  jittered_boxes[:, 3] += height_offset
-
-  return jittered_boxes
 
 # Written by Ross Girshick and Sean Bell
 def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
@@ -126,82 +107,24 @@ if __name__ == '__main__':
   import time
   
   t = time.time()
-  total_anchors = 0
+  a = anchors()
+  num_anchors = 0
 
-
-  iw = 1134
-  ih = 640
-  stride = 16
   # all_anchors = anchors_plane(200, 250, stride=4, boarder=0)
   # num_anchors += all_anchors.shape[0]
-  # for i in range(10):
-  gt_boxes = np.array([ [705.20550537 ,246.37339783,  915.78503418 , 411.53240967]])
-  # gt_boxes = np.array([ [476.03378296,  363.47793579,  961.50238037,  559.27886963],
-  #              [ 472.08267212,  378.50143433,  814.7980957,   562.92962646], 
-  #              [3.15492964,  491.46292114,  957.62628174,  630.52020264]])
-
-  jittered_gt_boxes = jitter_gt_boxes(gt_boxes[:, :4])
-  clipped_gt_boxes = clip_boxes(jittered_gt_boxes, (ih, iw))
-
-  ancs = anchors()
-  print("\n%s" % ancs)
-  all_anchors = cython_anchor.anchors_plane(40, 71, stride, ancs)
-  total_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
-  print (all_anchors)
+  for i in range(10):
+    ancs = anchors()
+    all_anchors = cython_anchor.anchors_plane(200, 250, 4, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+    all_anchors = cython_anchor.anchors_plane(100, 125, 8, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+    all_anchors = cython_anchor.anchors_plane(50, 63, 16, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+    all_anchors = cython_anchor.anchors_plane(25, 32, 32, ancs)
+    num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
+  print('average time: %f' % ((time.time() - t) / 10))
+  print('anchors: %d' % (num_anchors / 10))
+  print(a.shape, '\n', a)
   print (all_anchors.shape)
-  all_anchors = all_anchors.reshape([-1, 4])
-  labels = np.empty((all_anchors.shape[0], ), dtype=np.int32)
-  labels.fill(-1)
-
-  overlaps = cython_bbox.bbox_overlaps(
-                   np.ascontiguousarray(all_anchors, dtype=np.float),
-                   np.ascontiguousarray(clipped_gt_boxes, dtype=np.float))
-
-  gt_assignment = overlaps.argmax(axis=1)  # (A)
-  print(gt_assignment)
-  max_overlaps = overlaps[np.arange(total_anchors), gt_assignment]
-  print(max_overlaps)
-  gt_argmax_overlaps = overlaps.argmax(axis=0)  # G
-  print(gt_argmax_overlaps)
-  gt_max_overlaps = overlaps[gt_argmax_overlaps,
-                             np.arange(overlaps.shape[1])]
-  print(gt_max_overlaps)
-
-  # bg label: less than threshold IOU
-  labels[max_overlaps < 0.3] = 0    
-  # fg label: above threshold IOU 
-  labels[max_overlaps >= 0.7] = 1
-
-  # ignore cross-boundary anchors
-  cb0_inds = np.where(all_anchors[:, 0] <= 0  - (all_anchors[:, 2] - all_anchors[:, 0]) * 0)
-  cb1_inds = np.where(all_anchors[:, 1] <= 0  - (all_anchors[:, 3] - all_anchors[:, 1]) * 0)
-  cb2_inds = np.where(all_anchors[:, 2] >= iw + (all_anchors[:, 2] - all_anchors[:, 0]) * 0)
-  cb3_inds = np.where(all_anchors[:, 3] >= ih + (all_anchors[:, 3] - all_anchors[:, 1]) * 0)
-  cb_inds = np.unique(np.concatenate((cb0_inds, cb1_inds, cb2_inds, cb3_inds), axis =1))
-  labels[cb_inds] = -2
-  #LOG ("stride: %d total anchor: %d\tremained anchor: %d\t ih:%d iw:%d min size %d %d \t max size %d %d" % (stride, total_anchors, total_anchors-len(cb_inds), ih, iw, np.min(all_anchors[:, 0]), np.min(all_anchors[:, 1]), np.max(all_anchors[:, 2]), np.max(all_anchors[:, 3])))
-  print ("stride: %d total anchor: %d\tremained anchor: %d\t ih:%d iw:%d min size %d %d \t max size %d %d" % (stride, total_anchors, total_anchors-len(cb_inds), ih, iw, np.min(all_anchors[labels!=-2, 0]), np.min(all_anchors[labels!=-2, 1]), np.max(all_anchors[labels!=-2, 2]), np.max(all_anchors[labels!=-2, 3])))
-
-  labels[gt_argmax_overlaps] = 2
-
-  print ("above threshold: %s closest box: %s"% ((np.where(labels==1)), (np.where(labels==2))))
-  print ("all_anchors anchor\n%s" %all_anchors[labels==2, :])
-  print ("gt anchor\n%s" %gt_boxes)
-          
-  # all_anchors = cython_anchor.anchors_plane(20, 30, 16, ancs)
-  # num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
-
-  # all_anchors = cython_anchor.anchors_plane(40, 60, 8, ancs)
-  # num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
-
-  # all_anchors = cython_anchor.anchors_plane(80, 120, 4, ancs)
-  # num_anchors += all_anchors.shape[0] * all_anchors.shape[1] * all_anchors.shape[2]
-
-  # print('average time: %f' % ((time.time() - t) / 10))
-  # print('anchors: %d' % (num_anchors / 10))
-  # print(a.shape, '\n', a)
-  # print (all_anchors.shape)
   # from IPython import embed
   # embed()
-
-
