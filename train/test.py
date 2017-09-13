@@ -11,12 +11,14 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import json
+import cv2
 from time import gmtime, strftime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import libs.configs.config_v1 as cfg
 import libs.datasets.dataset_factory as datasets
 import libs.nets.nets_factory as network 
+import libs.datasets.pycocotools.mask as pycoco_mask
 
 import libs.preprocessings.coco_v1 as coco_preprocess
 import libs.nets.pyramid_network as pyramid_network
@@ -60,28 +62,70 @@ def _writeJSON(_dict):
         f.close()
         return
 
-def _convertBoxes(boxes, img_h, img_w, new_img_h, new_img_w):
-    new_boxes = boxes
-    new_boxes[:,2] = (boxes[:,2]*img_h/new_img_h - boxes[:,0]*img_h/new_img_h).astype(np.float32)
-    new_boxes[:,3] = (boxes[:,3]*img_w/new_img_w - boxes[:,1]*img_w/new_img_w).astype(np.float32)
-    new_boxes[:,0] = (boxes[:,0]*img_h/new_img_h).astype(np.float32)
-    new_boxes[:,1] = (boxes[:,1]*img_w/new_img_w).astype(np.float32)
-    return new_boxes
+def _convertBoxes(image_id, boxes, original_image_height, original_image_width, image_height, image_width):
+    original_image_boxes = boxes
+    height_ratio = original_image_height / image_height
+    width_ratio = original_image_width / image_width
+    original_image_boxes[:,2] = (boxes[:,2] * width_ratio  - boxes[:,0] * width_ratio ).astype(np.float32)
+    original_image_boxes[:,3] = (boxes[:,3] * height_ratio - boxes[:,1] * height_ratio).astype(np.float32)
+    original_image_boxes[:,0] = (boxes[:,0] * width_ratio ).astype(np.float32)
+    original_image_boxes[:,1] = (boxes[:,1] * height_ratio).astype(np.float32)
+    return original_image_boxes
 
-def _collectData(image_id, classes, boxes, probs, img_h, img_w, new_img_h, new_img_w):
+def _convertMasks(image_id, masks, classes, boxes, image_height, image_width):
+    assert masks.shape[0] == classes.shape[0] == boxes.shape[0], \
+      'convertMasks error %d vs %d ' % (masks.shape[0], classes.shape[0], boxes.shape[0])
+    original_image_masks = []
+    for instance_index, (mask, cls, box) in enumerate(zip(masks, classes, boxes)):
+        mask = np.transpose(mask, [2, 0, 1])
+        box = np.round(box)
+        box_offset_x = box[0]
+        box_offset_y = box[1]
+        box_width    = box[2]
+        box_height   = box[3]
+        #create blank image
+        size = (image_height, image_width)
+        original_image_mask = np.zeros(size, np.uint8)
+        #fit mask to box
+        mask = cv2.resize(mask[cls], (box_width, box_height))
+        #place box on blank image
+        y1 = int(box_offset_y)
+        y2 = int(box_offset_y + mask.shape[0])
+        x1 = int(box_offset_x) 
+        x2 = int(box_offset_x + mask.shape[1])
+
+        original_image_mask[y1:y2, x1:x2] = mask*255
+        #threshold by 0.5
+        original_image_mask = (original_image_mask >= 127) * 255
+        original_image_masks.append(original_image_mask)
+        # print(mask[cls].shape)
+        # print(box)
+    #original_image_masks = np.array(original_image_masks, order='F')
+    #original_image_masks = np.transpose(original_image_masks, [1, 2, 0])
+    
+    return original_image_masks
+
+def _collectData(image_id, classes, boxes, probs, original_image_height, original_image_width, image_height, image_width, masks=None):
     instance_num = probs.shape[0]
-    boxes = _convertBoxes(boxes, img_h, img_w, new_img_h, new_img_w)
+    original_image_boxes = _convertBoxes(image_id, boxes, original_image_height, original_image_width, image_height, image_width)
+    #TODO: convert masks to original_image_masks
+    if masks is not None:
+        original_image_masks = _convertMasks(image_id, masks, classes, original_image_boxes, original_image_height, original_image_width)
 
     image_ids = [image_id] * instance_num
     real_category_id = _cat_id_to_real_id(classes).tolist()
-    bbox = boxes.tolist()#change format
+    original_image_boxes = original_image_boxes.tolist()#change format
     score = probs.tolist()
 
     for instance_index in range(instance_num):
         instance = {}
         instance['image_id'] = int(image_ids[instance_index])
         instance['category_id'] = real_category_id[instance_index]
-        instance['bbox'] = bbox[instance_index]
+        instance['bbox'] = original_image_boxes[instance_index]
+        if masks is not None:
+            RLE = np.array(original_image_masks[instance_index], order='F', dtype= np.uint8)
+            RLE = pycoco_mask.encode(RLE)
+            instance['segmentation'] = RLE
         instance['score'] = score[instance_index][classes[instance_index]]
         _writeJSON(instance)
 
@@ -121,7 +165,7 @@ def test():
             weight_decay=FLAGS.weight_decay, is_training=True)
     outputs = pyramid_network.build(end_points, im_shape[1], im_shape[2], pyramid_map,
             num_classes=81,
-            base_anchors=9,
+            base_anchors=3,
             is_training=False,
             gt_boxes=None, gt_masks=None, loss_weights=[0.0, 0.0, 0.0, 0.0, 0.0])
 
@@ -169,11 +213,11 @@ def test():
         
         start_time = time.time()
 
-        image_id_str, img_h, img_w, new_img_h, new_img_w, \
+        image_id_str, original_image_heightnp, original_image_widthnp, image_heightnp, image_widthnp, \
         gt_boxesnp, gt_masksnp,\
         input_imagenp,\
         testing_mask_roisnp, testing_mask_final_masknp, testing_mask_final_clsesnp, testing_mask_final_scoresnp = \
-                     sess.run([image_id] + [ih] + [iw] + [new_ih] + [new_iw] +\
+                     sess.run([image_id] + [original_image_height] + [original_image_width] + [image_height] + [image_width] +\
                               [gt_boxes] + [gt_masks] +\
                               [input_image] + \
                               [testing_mask_rois] + [testing_mask_final_mask] + [testing_mask_final_clses] + [testing_mask_final_scores])
@@ -203,13 +247,12 @@ def test():
                       label=gt_boxesnp[:,4].astype(np.int32), 
                       prob=np.ones((gt_boxesnp.shape[0],81), dtype=np.float32),)
 
-
             print ("predict")
             # LOG (cat_id_to_cls_name(np.unique(np.argmax(np.array(training_rcnn_clsesnp),axis=1))))
             print (cat_id_to_cls_name(testing_mask_final_clsesnp))
             print (np.max(np.array(testing_mask_final_scoresnp),axis=1))
 
-        _collectData(image_id_str, testing_mask_final_clsesnp, testing_mask_roisnp, testing_mask_final_scoresnp, img_h, img_w, new_img_h, new_img_w)
+        _collectData(image_id_str, testing_mask_final_clsesnp, testing_mask_roisnp, testing_mask_final_scoresnp, original_image_heightnp, original_image_widthnp, image_heightnp, image_widthnp, testing_mask_final_masknp)
 
 if __name__ == '__main__':
     test()
