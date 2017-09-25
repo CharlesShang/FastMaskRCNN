@@ -93,22 +93,16 @@ def _convertMasks(image_id, masks, classes, boxes, image_height, image_width):
         y2 = int(box_offset_y + mask.shape[0])
         x1 = int(box_offset_x) 
         x2 = int(box_offset_x + mask.shape[1])
-
         original_image_mask[y1:y2, x1:x2] = mask*255
         #threshold by 0.5
         original_image_mask = (original_image_mask >= 127) * 255
         original_image_masks.append(original_image_mask)
-        # print(mask[cls].shape)
-        # print(box)
-    #original_image_masks = np.array(original_image_masks, order='F')
-    #original_image_masks = np.transpose(original_image_masks, [1, 2, 0])
-    
+
     return original_image_masks
 
 def _collectData(image_id, classes, boxes, probs, original_image_height, original_image_width, image_height, image_width, masks=None):
     instance_num = probs.shape[0]
     original_image_boxes = _convertBoxes(image_id, boxes, original_image_height, original_image_width, image_height, image_width)
-    #TODO: convert masks to original_image_masks
     if masks is not None:
         original_image_masks = _convertMasks(image_id, masks, classes, original_image_boxes, original_image_height, original_image_width)
 
@@ -162,7 +156,7 @@ def test():
 
     ## network
     logits, end_points, pyramid_map = network.get_network(FLAGS.network, image,
-            weight_decay=FLAGS.weight_decay, is_training=True)
+            weight_decay=0.0, batch_norm_decay=0.0, is_training=True)
     outputs = pyramid_network.build(end_points, im_shape[1], im_shape[2], pyramid_map,
             num_classes=81,
             base_anchors=3,
@@ -179,18 +173,15 @@ def test():
     ## solvers
     global_step = slim.create_global_step()
 
-    cropped_rois = tf.get_collection('__CROPPED__')[0]
-    transposed = tf.get_collection('__TRANSPOSED__')[0]
-    
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-    init_op = tf.group(
-            tf.global_variables_initializer(),
-            tf.local_variables_initializer()
-            )
-    sess.run(init_op)
+    # init_op = tf.group(
+    #         tf.global_variables_initializer(),
+    #         tf.local_variables_initializer()
+    #         )
+    # sess.run(init_op)
 
-    summary_op = tf.summary.merge_all()
+    # summary_op = tf.summary.merge_all()
     logdir = os.path.join(FLAGS.train_dir, strftime('%Y%m%d%H%M%S', gmtime()))
     if not os.path.exists(logdir):
         os.makedirs(logdir)
@@ -198,18 +189,11 @@ def test():
 
     ## restore
     restore(sess)
+    tf.train.start_queue_runners(sess=sess)
 
     ## main loop
-    coord = tf.train.Coordinator()
-    threads = []
-    # print (tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS))
-    for qr in tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS):
-        threads.extend(qr.create_threads(sess, coord=coord, start=True))
-
-    tf.train.start_queue_runners(sess=sess, coord=coord)
-
     # for step in range(FLAGS.max_iters):
-    for step in range(1000):#range(40503):
+    for step in range(82783):#range(40503):
         
         start_time = time.time()
 
@@ -238,7 +222,7 @@ def test():
                       label=testing_mask_final_clsesnp, 
                       prob=testing_mask_final_scoresnp,
                       mask=testing_mask_final_masknp,
-                      vis_th=0.2)
+                      vis_th=0.5)
 
             draw_bbox(step, 
                       np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 

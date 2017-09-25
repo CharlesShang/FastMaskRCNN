@@ -39,7 +39,7 @@ _networks_map = {
 
 def _extra_conv_arg_scope_with_bn(weight_decay=0.00001,
                      activation_fn=None,
-                     batch_norm_decay=0.997,
+                     batch_norm_decay=0.9,
                      batch_norm_epsilon=1e-5,
                      batch_norm_scale=True,
                      is_training=True):
@@ -170,7 +170,10 @@ def build_pyramid(net_name, end_points, bilinear=True, is_training=True):
   else:
     pyramid_map = net_name
   if _BN is True:
-    arg_scope = _extra_conv_arg_scope_with_bn()
+    if is_training is True:
+      arg_scope = _extra_conv_arg_scope_with_bn()
+    else:
+      arg_scope = _extra_conv_arg_scope_with_bn(batch_norm_decay=0.0)
     #arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
@@ -211,7 +214,10 @@ def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, i
   """
   outputs = {}
   if _BN is True:
-    arg_scope = _extra_conv_arg_scope_with_bn()
+    if is_training is True:
+      arg_scope = _extra_conv_arg_scope_with_bn()
+    else:
+      arg_scope = _extra_conv_arg_scope_with_bn(batch_norm_decay=0.0)
     # arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
@@ -300,9 +306,9 @@ def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, i
         rcnn = slim.max_pool2d(rcnn_cropped_features, [3, 3], stride=2, padding='SAME')
         rcnn = slim.flatten(rcnn)
         rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
-        rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=True)#is_training
+        rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)#is_training
         rcnn = slim.fully_connected(rcnn,  1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
-        rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=True)#is_training
+        rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)#is_training
         rcnn_clses = slim.fully_connected(rcnn, num_classes, activation_fn=None, normalizer_fn=None, 
                 weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
         rcnn_boxes = slim.fully_connected(rcnn, num_classes*4, activation_fn=None, normalizer_fn=None, 
@@ -349,7 +355,7 @@ def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, i
           
         else:
           ### for testing, mask network takes rcnn boxes as inputs
-          rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores) 
+          rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask = sample_rcnn_outputs(rcnn_final_boxes, rcnn_final_classes, rcnn_scores, class_agnostic=False) 
           [mask_assigned_rois, mask_assigned_clses, mask_assigned_scores, mask_assigned_batch_inds, mask_assigned_layer_inds] =\
                assign_boxes(rcnn_rois_to_mask, [rcnn_rois_to_mask, rcnn_clses_to_mask, rcnn_scores_to_mask, rcnn_batch_inds_to_mask], [2, 3, 4, 5])
           
@@ -429,7 +435,7 @@ def build_losses(pyramid, image_height, image_width, outputs, gt_boxes, gt_masks
   mask_batch_pos = []
 
   if _BN is True:
-    arg_scope = _extra_conv_arg_scope_with_bn()
+      arg_scope = _extra_conv_arg_scope_with_bn()
     # arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)

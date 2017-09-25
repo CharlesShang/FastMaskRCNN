@@ -70,9 +70,12 @@ def encode(gt_boxes, rois, num_classes):
       keep_inds = np.append(fg_inds, bg_inds)
 
       bbox_targets, bbox_inside_weights = _compute_targets(
-        rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
-      bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
-      bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
+         rois, gt_boxes[gt_assignment, :4], labels, num_classes)
+
+      # bbox_targets, bbox_inside_weights = _compute_targets(
+      #   rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
+      # bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
+      # bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
    
   else:
       # there is no gt

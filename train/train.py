@@ -10,6 +10,7 @@ import time
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+from tensorflow.python.ops import control_flow_ops
 import gc
 
 from time import gmtime, strftime
@@ -52,21 +53,32 @@ def solve(global_step):
     tf.summary.scalar('out_loss', out_loss)
     tf.summary.scalar('regular_loss', regular_loss)
 
-    update_ops = []
-    variables_to_train = _get_variables_to_train()
+    # update_ops = []
+    # variables_to_train = _get_variables_to_train()
     # update_op = optimizer.minimize(total_loss)
-    gradients = optimizer.compute_gradients(total_loss, var_list=variables_to_train)
-    grad_updates = optimizer.apply_gradients(gradients, 
-            global_step=global_step)
-    update_ops.append(grad_updates)
-    
+
+    # gradients = optimizer.compute_gradients(total_loss, var_list=variables_to_train)
+    # grad_updates = optimizer.apply_gradients(gradients, 
+    #         global_step=global_step)
+    # update_ops.append(grad_updates)
+
     # update moving mean and variance
     if FLAGS.update_bn:
         update_bns = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         update_bn = tf.group(*update_bns)
-        update_ops.append(update_bn)
+        # update_ops.append(update_bn)
+        total_loss = control_flow_ops.with_dependencies([update_bn], total_loss)
+    train_step  = slim.learning.create_train_op(total_loss, optimizer)
+    return train_step
 
-    return tf.group(*update_ops)
+    # if FLAGS.update_bn:
+    #     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    #     with tf.control_dependencies(update_ops):
+    #         train_op = slim.learning.create_train_op(total_loss, optimizer, global_step=global_step)
+    # else:
+    #     train_op = slim.learning.create_train_op(total_loss, optimizer, global_step=global_step)
+
+    # return train_op#train_step#tf.group(*update_ops)
 
 def restore(sess):
     """choose which param to restore"""
@@ -180,18 +192,29 @@ def train():
                              FLAGS.im_batch,
                              is_training=True)
 
+
+    data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16,
+            dtypes=(
+                image.dtype, original_image_height.dtype, original_image_width.dtype, image_height.dtype, image_width.dtype,
+                gt_boxes.dtype, gt_masks.dtype, 
+                num_instances.dtype, image_id.dtype)) 
+    enqueue_op = data_queue.enqueue((image, original_image_height, original_image_width, image_height, image_width, gt_boxes, gt_masks, num_instances, image_id))
+    data_queue_runner = tf.train.QueueRunner(data_queue, [enqueue_op] * 4)
+    tf.add_to_collection(tf.GraphKeys.QUEUE_RUNNERS, data_queue_runner)
+    (image, original_image_height, original_image_width, image_height, image_width, gt_boxes, gt_masks, num_instances, image_id) =  data_queue.dequeue()
+
     im_shape = tf.shape(image)
     image = tf.reshape(image, (im_shape[0], im_shape[1], im_shape[2], 3))
 
     ## network
     logits, end_points, pyramid_map = network.get_network(FLAGS.network, image,
-            weight_decay=FLAGS.weight_decay, is_training=True)
+            weight_decay=FLAGS.weight_decay, batch_norm_decay=FLAGS.batch_norm_decay, is_training=True)
     outputs = pyramid_network.build(end_points, image_height, image_width, pyramid_map,
             num_classes=81,
             base_anchors=3,#9#15
             is_training=True,
             gt_boxes=gt_boxes, gt_masks=gt_masks,
-            loss_weights=[10.0, 1.0, 1000.0, 1.0, 100.0])
+            loss_weights=[1.0, 1.0, 10.0, 1.0, 10.0])
             # loss_weights=[10.0, 1.0, 0.0, 0.0, 0.0])
             # loss_weights=[100.0, 100.0, 1000.0, 10.0, 100.0])
             # loss_weights=[0.2, 0.2, 1.0, 0.2, 1.0])
@@ -219,7 +242,7 @@ def train():
     cropped_rois = tf.get_collection('__CROPPED__')[0]
     transposed = tf.get_collection('__TRANSPOSED__')[0]
     
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     init_op = tf.group(
             tf.global_variables_initializer(),
@@ -242,8 +265,10 @@ def train():
     for qr in tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS):
         threads.extend(qr.create_threads(sess, coord=coord, daemon=True,
                                          start=True))
-
     tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    #tf.train.start_queue_runners(sess=sess)
+
     saver = tf.train.Saver(max_to_keep=20)
 
     for step in range(FLAGS.max_iters):

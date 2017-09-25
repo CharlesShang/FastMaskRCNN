@@ -198,21 +198,25 @@ def sample_rcnn_outputs(boxes, classes, prob, class_agnostic=False):
 
         det = np.hstack((boxes, scores)).astype(np.float32)
         keeps = nms_wrapper.nms(det, mask_nms_threshold)
-        
-        # filter low score
-        if post_nms_inst_n > 0:
-            keeps = keeps[:post_nms_inst_n]
+
         scores = scores[keeps]
         boxes = boxes[keeps, :]
         classes = classes[keeps]
         prob = prob[keeps, :]
+        
+        # filter low score
+        if post_nms_inst_n > 0:
+            scores = scores[:post_nms_inst_n]
+            boxes = boxes[:post_nms_inst_n, :]
+            classes = classes[:post_nms_inst_n]
+            prob = prob[:post_nms_inst_n, :]
 
         # quick fix for tensorflow error when no bbox presents
         #@TODO
         if len(classes) is 0:
             scores = np.zeros((1, 1))
             boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
-            classes = np.array([0])
+            classes = np.array([0]).reshape(-1)
             prob = np.zeros((1,81))
 
     else:

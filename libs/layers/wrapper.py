@@ -177,11 +177,11 @@ def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
 
         return assigned_tensors + [assigned_layers]
 
-def sample_rcnn_outputs_wrapper(final_boxes, classes, cls2_prob, scope='instInference'):
+def sample_rcnn_outputs_wrapper(final_boxes, classes, cls2_prob, class_agnostic=False, scope='instInference'):
     with tf.name_scope(scope) as sc:
         inst_boxes, inst_classes, inst_prob, batch_inds = \
             tf.py_func(sample.sample_rcnn_outputs,
-                       [final_boxes, classes, cls2_prob],
+                       [final_boxes, classes, cls2_prob, class_agnostic],
                        [tf.float32, tf.int32, tf.float32, tf.int32])
 
         inst_boxes = tf.convert_to_tensor(inst_boxes, name='inst_boxes')

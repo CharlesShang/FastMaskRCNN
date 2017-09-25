@@ -79,7 +79,7 @@ tf.app.flags.DEFINE_integer(
 ######################
 
 tf.app.flags.DEFINE_float(
-    'weight_decay', 0.00005, 'The weight decay on the model weights.')
+    'weight_decay', 0.00001, 'The weight decay on the model weights.')
 
 tf.app.flags.DEFINE_string(
     'optimizer', 'momentum',
@@ -118,23 +118,25 @@ tf.app.flags.DEFINE_float(
     'ftrl_l2', 0.0, 'The FTRL l2 regularization strength.')
 
 tf.app.flags.DEFINE_float(
-    'momentum', 0.99,
+    'momentum', 0.9,
     'The momentum for the MomentumOptimizer and RMSPropOptimizer.')
 
 tf.app.flags.DEFINE_float('rmsprop_momentum', 0.99, 'Momentum.')
 
 tf.app.flags.DEFINE_float('rmsprop_decay', 0.99, 'Decay term for RMSProp.')
 
+tf.app.flags.DEFINE_float('batch_norm_decay', 0.9, 'Decay term for batch normalization.')
+
 #######################
 # Learning Rate Flags #
 #######################
 
 tf.app.flags.DEFINE_string(
-    'learning_rate_decay_type', 'exponential',
+    'learning_rate_decay_type', 'fixed',
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.0002,
+tf.app.flags.DEFINE_float('learning_rate', 0.0002,#0.0002
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -244,7 +246,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'bg_threshold', 0.3,
+    'bg_threshold', 0.5,
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
