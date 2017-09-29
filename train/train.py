@@ -33,7 +33,7 @@ from libs.datasets import download_and_convert_coco
 from libs.visualization.pil_utils import cat_id_to_cls_name, draw_img, draw_bbox
 
 FLAGS = tf.app.flags.FLAGS
-resnet50 = resnet_v1.resnet_v1_50
+#resnet50 = resnet_v1.resnet_v1_50
 
 def solve(global_step):
     """add solver to losses"""
@@ -44,13 +44,14 @@ def solve(global_step):
 
     # compute and apply gradient
     losses = tf.get_collection(tf.GraphKeys.LOSSES)
+    loss = tf.add_n(losses)
     regular_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     regular_loss = tf.add_n(regular_losses)
-    out_loss = tf.add_n(losses)
-    total_loss = tf.add_n(losses + regular_losses)
+    
+    total_loss = loss + regular_loss
 
     tf.summary.scalar('total_loss', total_loss)
-    tf.summary.scalar('out_loss', out_loss)
+    tf.summary.scalar('loss', loss)
     tf.summary.scalar('regular_loss', regular_loss)
 
     # update_ops = []
@@ -62,23 +63,23 @@ def solve(global_step):
     #         global_step=global_step)
     # update_ops.append(grad_updates)
 
-    # update moving mean and variance
-    if FLAGS.update_bn:
-        update_bns = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        update_bn = tf.group(*update_bns)
-        # update_ops.append(update_bn)
-        total_loss = control_flow_ops.with_dependencies([update_bn], total_loss)
-    train_step  = slim.learning.create_train_op(total_loss, optimizer)
-    return train_step
-
+    ## update moving mean and variance
     # if FLAGS.update_bn:
-    #     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    #     with tf.control_dependencies(update_ops):
-    #         train_op = slim.learning.create_train_op(total_loss, optimizer, global_step=global_step)
-    # else:
-    #     train_op = slim.learning.create_train_op(total_loss, optimizer, global_step=global_step)
+    #     update_bns = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    #     update_bn = tf.group(*update_bns)
+    #     # update_ops.append(update_bn)
+    #     total_loss = control_flow_ops.with_dependencies([update_bn], total_loss)
+    # train_op  = slim.learning.create_train_op(total_loss, optimizer)
 
-    # return train_op#train_step#tf.group(*update_ops)
+    if FLAGS.update_bn:
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_op = slim.learning.create_train_op(total_loss, optimizer, global_step=global_step)
+    else:
+        train_op = slim.learning.create_train_op(total_loss, optimizer, global_step=global_step)
+
+    return train_op
+
 
 def restore(sess):
     """choose which param to restore"""
@@ -192,7 +193,7 @@ def train():
                              FLAGS.im_batch,
                              is_training=True)
 
-
+    ## queuing data
     data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16,
             dtypes=(
                 image.dtype, original_image_height.dtype, original_image_width.dtype, image_height.dtype, image_width.dtype,
@@ -234,6 +235,10 @@ def train():
     training_mask_clses_target          = outputs['training_mask_clses_target']
     training_mask_final_mask            = outputs['training_mask_final_mask']
     training_mask_final_mask_target     = outputs['training_mask_final_mask_target']
+    tmp_0 = outputs['rpn']['P2']['shape']
+    tmp_1 = outputs['rpn']['P3']['shape']
+    tmp_2 = outputs['rpn']['P4']['shape']
+    tmp_3 = outputs['rpn']['P5']['shape']
 
     ## solvers
     global_step = slim.create_global_step()
@@ -243,7 +248,9 @@ def train():
     transposed = tf.get_collection('__TRANSPOSED__')[0]
     
     gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.95)
+    #gpu_options = tf.GPUOptions(allow_growth=True)
     sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+    #sess = tf.InteractiveSession(config=tf.ConfigProto(gpu_options=gpu_options))
     init_op = tf.group(
             tf.global_variables_initializer(),
             tf.local_variables_initializer()
@@ -259,7 +266,7 @@ def train():
     ## restore
     restore(sess)
 
-    ## main loop
+    ## coord settings
     coord = tf.train.Coordinator()
     threads = []
     for qr in tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS):
@@ -267,23 +274,26 @@ def train():
                                          start=True))
     tf.train.start_queue_runners(sess=sess, coord=coord)
 
-    #tf.train.start_queue_runners(sess=sess)
-
+    ## saver init
     saver = tf.train.Saver(max_to_keep=20)
 
+    ## finalize the graph for checking memory leak
+    sess.graph.finalize()
+
+    ## main loop
     for step in range(FLAGS.max_iters):
         
         start_time = time.time()
 
         s_, tot_loss, reg_lossnp, image_id_str, \
         rpn_box_loss, rpn_cls_loss, rcnn_box_loss, rcnn_cls_loss, mask_loss, \
-        gt_boxesnp, \
+        gt_boxesnp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, \
         rpn_batch_pos, rpn_batch, rcnn_batch_pos, rcnn_batch, mask_batch_pos, mask_batch, \
         input_imagenp, \
         training_rcnn_roisnp, training_rcnn_clsesnp, training_rcnn_clses_targetnp, training_rcnn_scoresnp, training_mask_roisnp, training_mask_clses_targetnp, training_mask_final_masknp, training_mask_final_mask_targetnp  = \
                      sess.run([update_op, total_loss, regular_loss, image_id] + 
                               losses + 
-                              [gt_boxes] + 
+                              [gt_boxes] + [tmp_0] + [tmp_1] + [tmp_2] +[tmp_3] +
                               batch_info + 
                               [input_image] + 
                               [training_rcnn_rois] + [training_rcnn_clses] + [training_rcnn_clses_target] + [training_rcnn_scores] + [training_mask_rois] + [training_mask_clses_target] + [training_mask_final_mask] + [training_mask_final_mask_target])
@@ -303,6 +313,10 @@ def train():
             LOG (cat_id_to_cls_name(np.unique(np.argmax(np.asarray(training_rcnn_clses_targetnp),axis=1))))
             LOG ("predict")
             LOG (cat_id_to_cls_name(np.unique(np.argmax(np.array(training_rcnn_clsesnp),axis=1))))
+            LOG (tmp_0np)
+            LOG (tmp_1np)
+            LOG (tmp_2np)
+            LOG (tmp_3np)
 
         if step % 50 == 0: 
             draw_bbox(step, 

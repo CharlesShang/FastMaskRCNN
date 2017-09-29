@@ -60,19 +60,22 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       # TODO: speed bottleneck?
       # TODO: mask ground truth accuracy check
       for i in keep_inds:
-
-        gt_height = gt_masks.shape[1]
-        gt_width = gt_masks.shape[2]
-        enlarged_width = mask_width*20.0
-        enlarged_height = mask_height*20.0
-
         roi = rois[i, :4]
-        cropped = gt_masks[gt_assignment[i], :, :]
-        cropped = cv2.resize(cropped.astype(np.float32), (enlarged_width.astype(np.float32), enlarged_height.astype(np.float32)), interpolation=cv2.INTER_CUBIC  )
-        cropped = cropped[ int(round(roi[1]*enlarged_height/float(gt_height))) : int(round(roi[3]*enlarged_height/float(gt_height))), 
-                           int(round(roi[0]*enlarged_width /float(gt_width ))) : int(round(roi[2]*enlarged_width /float(gt_width )))  
-                           ]
-        cropped = cv2.resize(cropped.astype(np.float32), (mask_width.astype(np.float32), mask_height.astype(np.float32)), interpolation=cv2.INTER_CUBIC  )
+        cropped = gt_masks[gt_assignment[i], int(roi[1]):int(roi[3])+1, int(roi[0]):int(roi[2])+1]
+        cropped = cv2.resize(cropped.astype(np.float32), (mask_width.astype(np.float32), mask_height.astype(np.float32)))
+
+        # gt_height = gt_masks.shape[1]
+        # gt_width = gt_masks.shape[2]
+        # enlarged_width = mask_width*15.0
+        # enlarged_height = mask_height*15.0
+
+        # roi = rois[i, :4]
+        # cropped = gt_masks[gt_assignment[i], :, :]
+        # cropped = cv2.resize(cropped.astype(np.float32), (enlarged_width.astype(np.float32), enlarged_height.astype(np.float32)), interpolation=cv2.INTER_CUBIC  )
+        # cropped = cropped[ int(round(roi[1]*enlarged_height/float(gt_height))) : int(round(roi[3]*enlarged_height/float(gt_height))), 
+        #                    int(round(roi[0]*enlarged_width /float(gt_width ))) : int(round(roi[2]*enlarged_width /float(gt_width )))  
+        #                    ]
+        # cropped = cv2.resize(cropped.astype(np.float32), (mask_width.astype(np.float32), mask_height.astype(np.float32)), interpolation=cv2.INTER_CUBIC  )
 
         mask_targets[i, :, :, labels[i]] = cropped
         mask_inside_weights[i, :, :, labels[i]] = 1.0

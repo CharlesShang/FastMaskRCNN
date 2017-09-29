@@ -31,10 +31,6 @@ _networks_map = {
                'C4':'resnet_v1_50/block3/unit_5/bottleneck_v1',
                'C5':'resnet_v1_50/block4/unit_3/bottleneck_v1',
                },
-  'resnet101': {'C1': '', 'C2': '',
-                'C3': '', 'C4': '',
-                'C5': '',
-               }
 }
 
 def _extra_conv_arg_scope_with_bn(weight_decay=0.00001,
@@ -59,9 +55,9 @@ def _extra_conv_arg_scope_with_bn(weight_decay=0.00001,
       activation_fn=tf.nn.relu,
       normalizer_fn=slim.batch_norm,
       normalizer_params=batch_norm_params):
-    # with slim.arg_scope([slim.batch_norm], **batch_norm_params):
-    with slim.arg_scope([slim.max_pool2d], padding='SAME') as arg_sc:
-      return arg_sc
+    with slim.arg_scope([slim.batch_norm], **batch_norm_params):
+      with slim.arg_scope([slim.max_pool2d], padding='SAME') as arg_sc:
+        return arg_sc
 
 def _extra_conv_arg_scope(weight_decay=0.00001, activation_fn=None, normalizer_fn=None):
 
@@ -164,42 +160,43 @@ def build_pyramid(net_name, end_points, bilinear=True, is_training=True):
   Returns:
     returns several endpoints
   """
-  pyramid = {}
-  if isinstance(net_name, str):
-    pyramid_map = _networks_map[net_name]
-  else:
-    pyramid_map = net_name
+
   if _BN is True:
     if is_training is True:
       arg_scope = _extra_conv_arg_scope_with_bn()
     else:
-      arg_scope = _extra_conv_arg_scope_with_bn(batch_norm_decay=0.0)
-    #arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
+      arg_scope = _extra_conv_arg_scope_with_bn(batch_norm_decay=0.0, weight_decay=0.0)
+      #arg_scope = _extra_conv_arg_scope_with_bn(batch_norm_decay=0.0, weight_decay=0.0, is_training=is_training)
   else:
     arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
   #
-  with tf.variable_scope('pyramid'):
-    with slim.arg_scope(arg_scope):
+  with tf.name_scope('pyramid') as py_scope:
+    with slim.arg_scope(arg_scope) as slim_scope:
+      pyramid = {}
+      if isinstance(net_name, str):
+        pyramid_map = _networks_map[net_name]
+      else:
+        pyramid_map = net_name
       
       pyramid['P5'] = \
-        slim.conv2d(end_points[pyramid_map['C5']], 256, [1, 1], stride=1, scope='C5')
+        slim.conv2d(end_points[pyramid_map['C5']], 256, [1, 1], stride=1, scope='pyramid/C5')
       
       for c in range(4, 1, -1):
         s, s_ = pyramid['P%d'%(c+1)], end_points[pyramid_map['C%d' % (c)]]
 
         up_shape = tf.shape(s_)
 
-        s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='C%d/upscale'%c)
-        s_ = slim.conv2d(s_, 256, [1,1], stride=1, scope='C%d'%c)
+        s = tf.image.resize_bilinear(s, [up_shape[1], up_shape[2]], name='pyramid/C%d/upscale'%c)
+        s_ = slim.conv2d(s_, 256, [1,1], stride=1, scope='pyramid/C%d'%c)
         
-        s = tf.add(s, s_, name='C%d/addition'%c)
-        s = slim.conv2d(s, 256, [3,3], stride=1, scope='C%d/fusion'%c)
+        s = tf.add(s, s_, name='pyramid/C%d/addition'%c)
+        s = slim.conv2d(s, 256, [3,3], stride=1, scope='pyramid/C%d/fusion'%c)
         
         pyramid['P%d'%(c)] = s
       
-      return pyramid
+      return pyramid, py_scope, slim_scope
   
-def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, is_training=False, gt_boxes=None):
+def build_heads(pyramid, py_scope, slim_scope, image_height, image_width, num_classes, base_anchors, is_training=False, gt_boxes=None):
   """Build the 3-way outputs, i.e., class, box and mask in the pyramid
   Algo
   ----
@@ -213,17 +210,16 @@ def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, i
     7. Build losses
   """
   outputs = {}
-  if _BN is True:
-    if is_training is True:
-      arg_scope = _extra_conv_arg_scope_with_bn()
-    else:
-      arg_scope = _extra_conv_arg_scope_with_bn(batch_norm_decay=0.0)
-    # arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
-  else:
-    arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
-
-  with slim.arg_scope(arg_scope):
-    with tf.variable_scope('pyramid'):
+  # if _BN is True:
+  #   if is_training is True:
+  #     arg_scope = _extra_conv_arg_scope_with_bn()
+  #   else:
+  #     arg_scope = _extra_conv_arg_scope_with_bn(batch_norm_decay=0.0)
+  #   # arg_scope = _extra_conv_arg_scope_with_bn(is_training=is_training)
+  # else:
+  #   arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
+  with tf.name_scope(py_scope) as py_scope:
+    with slim.arg_scope(slim_scope) as slim_scope:
         ### for p in pyramid
         outputs['rpn'] = {}
         for i in range(5, 1, -1):
@@ -240,16 +236,16 @@ def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, i
           """
           shape = tf.shape(pyramid[p])
           height, width = shape[1], shape[2]
-          rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='%s/rpn'%p)
-          box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='%s/rpn/box' % p, \
+          rpn = slim.conv2d(pyramid[p], 256, [3, 3], stride=1, activation_fn=tf.nn.relu, scope='pyramid/%s/rpn'%p)
+          box = slim.conv2d(rpn, base_anchors * 4, [1, 1], stride=1, scope='pyramid/%s/rpn/box' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.001), activation_fn=None, normalizer_fn=None)
-          cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='%s/rpn/cls' % p, \
+          cls = slim.conv2d(rpn, base_anchors * 2, [1, 1], stride=1, scope='pyramid/%s/rpn/cls' % p, \
                   weights_initializer=tf.truncated_normal_initializer(stddev=0.01), activation_fn=None, normalizer_fn=None)
 
           anchor_scales = [8]#[2 **(i-2), 2 ** (i-1), 2 **(i)]
           print("anchor_scales = " , anchor_scales)
           all_anchors = gen_all_anchors(height, width, stride, anchor_scales)
-          outputs['rpn'][p]={'box':box, 'cls':cls, 'anchor':all_anchors}
+          outputs['rpn'][p]={'box':box, 'cls':cls, 'anchor':all_anchors, 'shape':shape}
 
         ### gather boxes, clses, anchors from all pyramid layers
         rpn_boxes = [tf.reshape(outputs['rpn']['P%d'%p]['box'], [-1, 4]) for p in range(5, 1, -1)]  
@@ -305,20 +301,19 @@ def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, i
         """
         rcnn = slim.max_pool2d(rcnn_cropped_features, [3, 3], stride=2, padding='SAME')
         rcnn = slim.flatten(rcnn)
-        rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
+        rcnn = slim.fully_connected(rcnn, 1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001), scope="pyramid/fully_connected")
         rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)#is_training
-        rcnn = slim.fully_connected(rcnn,  1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
+        rcnn = slim.fully_connected(rcnn,  1024, activation_fn=tf.nn.relu, weights_initializer=tf.truncated_normal_initializer(stddev=0.001), scope="pyramid/fully_connected_1")
         rcnn = slim.dropout(rcnn, keep_prob=0.75, is_training=is_training)#is_training
         rcnn_clses = slim.fully_connected(rcnn, num_classes, activation_fn=None, normalizer_fn=None, 
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.001), scope="pyramid/fully_connected_2")
         rcnn_boxes = slim.fully_connected(rcnn, num_classes*4, activation_fn=None, normalizer_fn=None, 
-                weights_initializer=tf.truncated_normal_initializer(stddev=0.001))
+                weights_initializer=tf.truncated_normal_initializer(stddev=0.001), scope="pyramid/fully_connected_3")
         
         ### softmax to get probability
         rcnn_scores = tf.nn.softmax(rcnn_clses)
 
         ### decode ROIs and box regression values into bounding boxes
-        rcnn_final_boxes, rcnn_final_classes, rcnn_final_scores = roi_decoder(rcnn_boxes, rcnn_scores, rcnn_ordered_rois, image_height, image_width)
         rcnn_final_boxes, rcnn_final_classes, rcnn_final_scores = roi_decoder(rcnn_boxes, rcnn_scores, rcnn_ordered_rois, image_height, image_width)
   
         outputs['rcnn_ordered_rois'] = rcnn_ordered_rois
@@ -389,20 +384,22 @@ def build_heads(pyramid, image_height, image_width, num_classes, base_anchors, i
         m: an array of shape (28, 28, num_classes). Note that this value is before sigmoid.
         """
         m = mask_cropped_features
-        for _ in range(4):
-            m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu)
-        m = slim.conv2d_transpose(m, 256, 2, stride=2, padding='VALID', activation_fn=tf.nn.relu)
+        m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu, scope="pyramid/Conv")
+        m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu, scope="pyramid/Conv_1")
+        m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu, scope="pyramid/Conv_2")
+        m = slim.conv2d(m, 256, [3, 3], stride=1, padding='SAME', activation_fn=tf.nn.relu, scope="pyramid/Conv_3")
+        m = slim.conv2d_transpose(m, 256, 2, stride=2, padding='VALID', activation_fn=tf.nn.relu, scope="pyramid/Conv2d_transpose")
         tf.add_to_collection('__TRANSPOSED__', m)
-        m = slim.conv2d(m, num_classes, [1, 1], stride=1, padding='VALID', activation_fn=None, normalizer_fn=None)
+        m = slim.conv2d(m, num_classes, [1, 1], stride=1, padding='VALID', activation_fn=None, normalizer_fn=None, scope="pyramid/Conv_4")
 
         outputs['mask_ordered_rois'] = mask_ordered_rois
         outputs['mask_cropped_features'] = mask_cropped_features 
         outputs['mask_mask'] = m
         outputs['mask_final_mask'] = tf.nn.sigmoid(m)
           
-        return outputs
+        return outputs, py_scope, slim_scope
 
-def build_losses(pyramid, image_height, image_width, outputs, gt_boxes, gt_masks,
+def build_losses(pyramid, py_scope, slim_scope, image_height, image_width, outputs, gt_boxes, gt_masks,
                  num_classes, base_anchors,
                  rpn_box_lw =0.1, rpn_cls_lw = 0.1,
                  rcnn_box_lw=1.0, rcnn_cls_lw=0.1,
@@ -434,14 +431,13 @@ def build_losses(pyramid, image_height, image_width, outputs, gt_boxes, gt_masks
   rcnn_batch_pos = []
   mask_batch_pos = []
 
-  if _BN is True:
-      arg_scope = _extra_conv_arg_scope_with_bn()
-    # arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
-  else:
-    arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
-  with slim.arg_scope(arg_scope):
-      with tf.variable_scope('pyramid'):
-
+  # if _BN is True:
+  #     arg_scope = _extra_conv_arg_scope_with_bn()
+  #   # arg_scope = _extra_conv_arg_scope_with_bn(is_training=True)
+  # else:
+  #   arg_scope = _extra_conv_arg_scope(activation_fn=tf.nn.relu)
+  with tf.name_scope(py_scope) as py_scope:
+      with slim.arg_scope(slim_scope) as slim_scope:
         ## assigning gt_boxes
         [assigned_gt_boxes, assigned_layer_inds] = assign_boxes(gt_boxes, [gt_boxes], [2, 3, 4, 5])
 
@@ -617,13 +613,13 @@ def build(end_points, image_height, image_width, pyramid_map,
         gt_masks=None, 
         loss_weights=[0.1, 0.1, 1.0, 0.1, 1.0]):
     
-    pyramid = build_pyramid(pyramid_map, end_points, is_training=is_training)
+    pyramid, py_scope, slim_scope = build_pyramid(pyramid_map, end_points, is_training=is_training)
 
     if is_training: 
-      outputs = \
-          build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
+      outputs, py_scope, slim_scope = \
+          build_heads(pyramid, py_scope, slim_scope, image_height, image_width, num_classes, base_anchors, 
                       is_training=is_training, gt_boxes=gt_boxes)
-      loss, losses, batch_info = build_losses(pyramid, image_height, image_width, outputs, 
+      loss, losses, batch_info = build_losses(pyramid, py_scope, slim_scope, image_height, image_width, outputs, 
                       gt_boxes, gt_masks,
                       num_classes=num_classes, base_anchors=base_anchors,
                       rpn_box_lw=loss_weights[0], rpn_cls_lw=loss_weights[1],
@@ -634,8 +630,8 @@ def build(end_points, image_height, image_width, pyramid_map,
       outputs['total_loss'] = loss
       outputs['batch_info'] = batch_info
     else:
-      outputs = \
-          build_heads(pyramid, image_height, image_width, num_classes, base_anchors, 
+      outputs, py_scope, slim_scope = \
+          build_heads(pyramid, py_scope, slim_scope, image_height, image_width, num_classes, base_anchors, 
                       is_training=is_training)
 
     ### just decode outputs into readable prediction
