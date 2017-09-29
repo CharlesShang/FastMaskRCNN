@@ -90,12 +90,12 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
     items_to_descriptions=_ITEMS_TO_DESCRIPTIONS,
     num_classes=_NUM_CLASSES)
 
-def read(tfrecords_filename):
+def read(tfrecords_filename, is_training=False):
 
   if not isinstance(tfrecords_filename, list):
     tfrecords_filename = [tfrecords_filename]
   filename_queue = tf.train.string_input_producer(
-    tfrecords_filename, num_epochs=100)
+    tfrecords_filename, shuffle=is_training)#, num_epochs=100
 
   options = tf.python_io.TFRecordOptions(TFRecordCompressionType.ZLIB)
   reader = tf.TFRecordReader(options=options)
