@@ -6,8 +6,8 @@
 # --------------------------------------------------------
 from . import cython_nms
 from . import cython_bbox
-import nms
-import timer
+from . import nms
+from . import timer
 from .anchor import anchors
 from .anchor import anchors_plane
 from .roi import roi_cropping

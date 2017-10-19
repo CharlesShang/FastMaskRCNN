@@ -170,11 +170,11 @@ def train():
                              FLAGS.im_batch,
                              is_training=True)
 
-    data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16,
-            dtypes=(
-                image.dtype, ih.dtype, iw.dtype, 
-                gt_boxes.dtype, gt_masks.dtype, 
-                num_instances.dtype, img_id.dtype)) 
+    data_queue = tf.RandomShuffleQueue(capacity=32, min_after_dequeue=16, dtypes=(
+                                                    image.dtype, ih.dtype, iw.dtype,
+                                                    gt_boxes.dtype, gt_masks.dtype,
+                                                    num_instances.dtype, img_id.dtype))
+
     enqueue_op = data_queue.enqueue((image, ih, iw, gt_boxes, gt_masks, num_instances, img_id))
     data_queue_runner = tf.train.QueueRunner(data_queue, [enqueue_op] * 4)
     tf.add_to_collection(tf.GraphKeys.QUEUE_RUNNERS, data_queue_runner)
