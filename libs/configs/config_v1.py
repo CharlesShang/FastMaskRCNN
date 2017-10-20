@@ -26,7 +26,7 @@ tf.app.flags.DEFINE_string(
 #                  dataset
 ##########################
 tf.app.flags.DEFINE_bool(
-    'update_bn', False,
+    'update_bn', True,
     'Whether or not to update bacth normalization layer')
 
 tf.app.flags.DEFINE_integer(
@@ -40,6 +40,10 @@ tf.app.flags.DEFINE_string(
 tf.app.flags.DEFINE_string(
     'dataset_split_name', 'train2014',
     'The name of the train/test/val split.')
+
+tf.app.flags.DEFINE_string(
+    'dataset_split_name_test', 'train2014',#val2014
+    'The name of the test/val split.')
 
 tf.app.flags.DEFINE_string(
     'dataset_dir', 'data/coco/',
@@ -75,7 +79,7 @@ tf.app.flags.DEFINE_integer(
 ######################
 
 tf.app.flags.DEFINE_float(
-    'weight_decay', 0.00005, 'The weight decay on the model weights.')
+    'weight_decay', 0.00001, 'The weight decay on the model weights.')
 
 tf.app.flags.DEFINE_string(
     'optimizer', 'momentum',
@@ -114,23 +118,25 @@ tf.app.flags.DEFINE_float(
     'ftrl_l2', 0.0, 'The FTRL l2 regularization strength.')
 
 tf.app.flags.DEFINE_float(
-    'momentum', 0.99,
+    'momentum', 0.9,
     'The momentum for the MomentumOptimizer and RMSPropOptimizer.')
 
 tf.app.flags.DEFINE_float('rmsprop_momentum', 0.99, 'Momentum.')
 
 tf.app.flags.DEFINE_float('rmsprop_decay', 0.99, 'Decay term for RMSProp.')
 
+tf.app.flags.DEFINE_float('batch_norm_decay', 0.9, 'Decay term for batch normalization.')
+
 #######################
 # Learning Rate Flags #
 #######################
 
 tf.app.flags.DEFINE_string(
-    'learning_rate_decay_type', 'exponential',
+    'learning_rate_decay_type', 'fixed',
     'Specifies how the learning rate is decayed. One of "fixed", "exponential",'
     ' or "polynomial"')
 
-tf.app.flags.DEFINE_float('learning_rate', 0.002,
+tf.app.flags.DEFINE_float('learning_rate', 0.0001,#0.0002
                           'Initial learning rate.')
 
 tf.app.flags.DEFINE_float(
@@ -226,20 +232,21 @@ tf.app.flags.DEFINE_boolean(
 #######################
 # BOX Flags #
 #######################
-tf.app.flags.DEFINE_float(
-    'rpn_bg_threshold', 0.3,
-    'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
     'rpn_fg_threshold', 0.7,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'fg_threshold', 0.7,
+    'rpn_bg_threshold', 0.3,
+    'Only regions which intersection is less than bg_threshold are considered to be fg')
+
+tf.app.flags.DEFINE_float(
+    'fg_threshold', 0.5,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'bg_threshold', 0.3,
+    'bg_threshold', 0.5,
     'Only regions which intersection is less than bg_threshold are considered to be bg')
 
 tf.app.flags.DEFINE_integer(
@@ -255,12 +262,12 @@ tf.app.flags.DEFINE_float(
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
-    'rpn_batch_size', 500,
+    'rpn_batch_size', 256,
     'Number of rpn anchors that should be sampled to train this network')
 
 tf.app.flags.DEFINE_integer(
-    'allow_border', 10,
-    'How many pixels out of an image')
+    'allow_border', 0.0,
+    'Percentage of bounding box height and length that are allowed to be out of an image boundary')
 
 ##################################
 #            NMS                #
@@ -274,9 +281,17 @@ tf.app.flags.DEFINE_integer(
     'post_nms_top_n', 2000,
     'Number of rpn anchors that should be sampled after nms')
 
+tf.app.flags.DEFINE_integer(
+    'post_nms_inst_n', 300,
+    "Number of inst after NMS")
+
 tf.app.flags.DEFINE_float(
     'rpn_nms_threshold', 0.7,
-    'NMS threshold')
+    'NMS threshold in RPN')
+
+tf.app.flags.DEFINE_float(
+    'mask_nms_threshold', 0.3,
+    'NMS threshold in mask network during testing')
 
 ##################################
 #            Mask                #
@@ -290,7 +305,7 @@ tf.app.flags.DEFINE_float(
     'mask_threshold', 0.50,
     'Least intersection of a positive mask')
 tf.app.flags.DEFINE_integer(
-    'masks_per_image', 64,
+    'masks_per_image', 256,
     'Number of rois that should be sampled to train this network')
 
 tf.app.flags.DEFINE_float(

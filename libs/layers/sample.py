@@ -2,7 +2,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
 import numpy as np
 
 import libs.configs.config_v1 as cfg
@@ -13,7 +12,7 @@ from libs.logs.log import LOG
 
 _DEBUG=False
 
-def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
+def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False, with_nms=False, random=False):
   """Sample boxes according to scores and some learning strategies
   assuming the first class is background
   Params:
@@ -27,116 +26,274 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
 
   # training: 12000, 2000
   # testing: 6000, 400
-  if not is_training:
-    pre_nms_top_n = int(pre_nms_top_n / 2)
-    post_nms_top_n = int(post_nms_top_n / 5)
+  # if not is_training:
+  #   pre_nms_top_n = int(pre_nms_top_n / 2)
+  #   post_nms_top_n = int(post_nms_top_n / 5)
     
   boxes = boxes.reshape((-1, 4))
   scores = scores.reshape((-1, 1))
   assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
-  
-  # filter backgrounds
-  # Hope this will filter most of background anchors, since a argsort is too slow..
+
+  ## filter backgrounds
+  ## Hope this will filter most of background anchors, since a argsort is too slow..
   if only_positive:
     keeps = np.where(scores > 0.5)[0]
     boxes = boxes[keeps, :]
     scores = scores[keeps]
-  
-  # filter minimum size
+
+  ## filter minimum size
   keeps = _filter_boxes(boxes, min_size=min_size)
   boxes = boxes[keeps, :]
   scores = scores[keeps]
-  
-  # filter with scores
+
+  ## filter before nms
+  if random is True:
+    keeps = np.random.choice(np.arange(boxes.shape[0]), size=pre_nms_top_n, replace=False)
+    boxes = boxes[keeps, :]
+    scores = scores[keeps]
+  else:
+    if len(scores) > pre_nms_top_n:
+      partial_order = scores.ravel()
+      partial_order = np.argpartition(-partial_order, pre_nms_top_n)[:pre_nms_top_n]
+
+      boxes = boxes[partial_order, :]
+      scores = scores[partial_order]
+
+  ## sort
   order = scores.ravel().argsort()[::-1]
-  if pre_nms_top_n > 0:
-    order = order[:pre_nms_top_n]
   boxes = boxes[order, :]
   scores = scores[order]
-
-  # filter with nms
-  det = np.hstack((boxes, scores)).astype(np.float32)
-  keeps = nms_wrapper.nms(det, rpn_nms_threshold)
   
+  ## filter by nms
+  if with_nms is True:
+    det = np.hstack((boxes, scores)).astype(np.float32)
+    keeps = nms_wrapper.nms(det, rpn_nms_threshold)
+    boxes = boxes[keeps, :]
+    scores = scores[keeps].astype(np.float32)
+
+  ## filter after nms
   if post_nms_top_n > 0:
-    keeps = keeps[:post_nms_top_n]
-  boxes = boxes[keeps, :]
-  scores = scores[keeps]
+    boxes = boxes[:post_nms_top_n, :]
+    scores = scores[:post_nms_top_n]
+
+  #create dummpy box in case of no box remains
+  if boxes.size is 0:
+    boxes = np.array([[0,0,16,16]], dtype=np.float32)
+    scores = np.array([0,], dtype=np.float32)
+
   batch_inds = np.zeros([boxes.shape[0]], dtype=np.int32)
 
-  # # random sample boxes
+  ## random sample boxes
   ## try early sample later
   # fg_inds = np.where(scores > 0.5)[0]
   # num_fgs = min(len(fg_inds.size), int(rois_per_image * fg_roi_fraction))
 
-  if _DEBUG:
-    LOG('SAMPLE: %d rois has been choosen' % len(scores))
-    LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
-    LOG('SAMPLE: a negative box: %d %d %d %d %.4f' % (boxes[-1, 0], boxes[-1, 1], boxes[-1, 2], boxes[-1, 3], scores[-1]))
-    hs = boxes[:, 3] - boxes[:, 1]
-    ws = boxes[:, 2] - boxes[:, 0]
-    assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
-  
-  return boxes, scores.astype(np.float32), batch_inds
+  # if _DEBUG:
+  #   LOG('SAMPLE: %d rois has been choosen' % len(scores))
+  #   LOG('SAMPLE: a positive box: %d %d %d %d %.4f' % (boxes[0, 0], boxes[0, 1], boxes[0, 2], boxes[0, 3], scores[0]))
+  #   LOG('SAMPLE: a negative box: %d %d %d %d %.4f' % (boxes[-1, 0], boxes[-1, 1], boxes[-1, 2], boxes[-1, 3], scores[-1]))
+  #   hs = boxes[:, 3] - boxes[:, 1]
+  #   ws = boxes[:, 2] - boxes[:, 0]
+  #   assert min(np.min(hs), np.min(ws)) > 0, 'invalid boxes'
+  # print(boxes.shape)  
+  return boxes, scores, batch_inds
 
 def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, only_positive=False):
-    """sample boxes for refined output"""
-    boxes, scores, batch_inds = sample_rpn_outputs(boxes, scores, is_training, only_positive)
+    """sample boxes using RPN scores 
+    only_positive: Flag to exclude bbox with RPN score less than 0.5
+    with_nms: Flag to use NMS
+    """
+    boxes, scores, batch_inds = sample_rpn_outputs(boxes, scores, is_training=is_training, only_positive=only_positive, with_nms=True)
 
-    if gt_boxes.size > 0:
+    if gt_boxes.size > 0 and boxes.size > 0:
         overlaps = cython_bbox.bbox_overlaps(
                 np.ascontiguousarray(boxes[:, 0:4], dtype=np.float),
                 np.ascontiguousarray(gt_boxes[:, 0:4], dtype=np.float))
         gt_assignment = overlaps.argmax(axis=1) # B
         max_overlaps = overlaps[np.arange(boxes.shape[0]), gt_assignment] # B
+
+        ## rcnn foreground bbox with high overlap
         fg_inds = np.where(max_overlaps >= cfg.FLAGS.fg_threshold)[0]
-        if _DEBUG and np.argmax(overlaps[fg_inds],axis=1).size < gt_boxes.size/5.0:
-            print("gt_size")
-            print(gt_boxes)
-            gt_height = (gt_boxes[:,2]-gt_boxes[:,0])
-            gt_width = (gt_boxes[:,3]-gt_boxes[:,1])
-            gt_dim = np.vstack((gt_height, gt_width))
-            print(np.transpose(gt_dim))
-            #print(gt_height)
-            #print(gt_width)
+        ## rcnn foreground bbox with highest overlap area on gt
+        gt_argmax_overlaps = overlaps.argmax(axis=0) # G
 
-            print('SAMPLE: %d after overlaps by %s' % (len(fg_inds),cfg.FLAGS.fg_threshold))
-            print("detected object no.")
-            print(np.argmax(overlaps[fg_inds],axis=1))
-            print("total object")
-            print(gt_boxes.size/5.0)
+        fg_inds = np.union1d(gt_argmax_overlaps, fg_inds)
 
+        ## mask foreground bbox with high overlap
         mask_fg_inds = np.where(max_overlaps >= cfg.FLAGS.mask_threshold)[0]
+
+        ## limit mask foreground bbox
         if mask_fg_inds.size > cfg.FLAGS.masks_per_image:
             mask_fg_inds = np.random.choice(mask_fg_inds, size=cfg.FLAGS.masks_per_image, replace=False)
 
-        if True:
-            gt_argmax_overlaps = overlaps.argmax(axis=0) # G
-            fg_inds = np.union1d(gt_argmax_overlaps, fg_inds)
-
+        ## limit rcnn foreground bbox
         fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
         if fg_inds.size > 0 and fg_rois < fg_inds.size:
             fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
-
-        # TODO: sampling strategy
+        
+        ## limit rcnn background bbox
+        ## TODO: sampling strategy
         bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-        bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8)#64
+        bg_rois = int(max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8))#cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))#128
         if bg_inds.size > 0 and bg_rois < bg_inds.size:
-           bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
-
+            bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
         keep_inds = np.append(fg_inds, bg_inds)
-        #print(gt_boxes[np.argmax(overlaps[fg_inds],axis=1),4])
+
+        ## quick fix for mask foreground is null  
+        if mask_fg_inds.size is 0:
+            mask_fg_inds = keep_inds
     else:
         bg_inds = np.arange(boxes.shape[0])
-        bg_rois = min(int(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction)), 8)#64
+        bg_rois = int(min(cfg.FLAGS.rois_per_image * (1-cfg.FLAGS.fg_roi_fraction), 8))# cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))#128
         if bg_rois < bg_inds.size:
             bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
         keep_inds = bg_inds
-        mask_fg_inds = np.arange(0)
+        mask_fg_inds = bg_inds
     
-    return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds],\
+    return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds], \
            boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds]
+
+def sample_rcnn_outputs(boxes, classes, prob, class_agnostic=False):
+    min_size = cfg.FLAGS.min_size
+    mask_nms_threshold = cfg.FLAGS.mask_nms_threshold
+    post_nms_inst_n = cfg.FLAGS.post_nms_inst_n
+    if class_agnostic is True:
+        scores = prob.max(axis=1)
+
+        boxes = boxes.reshape((-1, 4))
+        classes = classes.reshape((-1, 1))
+        scores = scores.reshape((-1, 1))
+        probs = probs.reshape((-1, 81))
+
+        assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
+
+        # filter background
+        keeps = np.where(classes != 0)[0]
+        scores = scores[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+
+        # filter minimum size
+        keeps = _filter_boxes(boxes, min_size=min_size)
+        scores = scores[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+        
+        #filter with scores
+        keeps = np.where(scores > 0.5)[0]
+        scores = scores[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+
+        # filter with nms
+        order = scores.ravel().argsort()[::-1]
+        scores = scores[order]
+        boxes = boxes[order, :]
+        classes = classes[order]
+        prob = prob[order, :]
+
+        det = np.hstack((boxes, scores)).astype(np.float32)
+        keeps = nms_wrapper.nms(det, mask_nms_threshold)
+
+        scores = scores[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+        
+        # filter low score
+        if post_nms_inst_n > 0:
+            scores = scores[:post_nms_inst_n]
+            boxes = boxes[:post_nms_inst_n, :]
+            classes = classes[:post_nms_inst_n]
+            prob = prob[:post_nms_inst_n, :]
+
+        # quick fix for tensorflow error when no bbox presents
+        #@TODO
+        if len(classes) is 0:
+            scores = np.zeros((1, 1))
+            boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
+            classes = np.array([0]).reshape(-1)
+            prob = np.zeros((1,81))
+
+    else:
+        scores = prob.max(axis=1)
+
+        boxes = boxes.reshape((-1, 4))
+        classes = classes.reshape((-1, 1))
+        scores = scores.reshape((-1, 1))
+        prob = prob.reshape((-1, 81))
+        assert scores.shape[0] == boxes.shape[0], 'scores and boxes dont match'
+
+        # filter background
+        keeps = np.where(classes != 0)[0]
+        scores = scores[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+
+        # filter minimum size
+        keeps = _filter_boxes(boxes, min_size=min_size)
+        scores = scores[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+        
+        #filter with scores
+        keeps = np.where(scores > 0.5)[0]
+        scores = scores[keeps]
+        boxes = boxes[keeps, :]
+        classes = classes[keeps]
+        prob = prob[keeps, :]
+
+        all_scores = []
+        all_boxes = []
+        all_classes = []
+        all_prob = []
+
+        for c in range(1,(prob.shape[1])):
+          keeps = (classes == c).reshape(-1)
+
+          per_class_scores = scores[keeps]
+          per_class_boxes = boxes[keeps, :]
+          per_class_classes = classes[keeps]
+          per_class_prob = prob[keeps, :]
+
+          # filter with nms
+          order = per_class_scores.ravel().argsort()[::-1]
+          per_class_scores = per_class_scores[order]
+          per_class_boxes = per_class_boxes[order, :]
+          per_class_classes = per_class_classes[order]
+          per_class_prob = per_class_prob[order, :]
+
+          det = np.hstack((per_class_boxes, per_class_scores)).astype(np.float32)
+          keeps = nms_wrapper.nms(det, mask_nms_threshold)
+          
+          # filter low score
+          if post_nms_inst_n > 0:
+              keeps = keeps[:post_nms_inst_n]
+          all_scores.append(per_class_scores[keeps])
+          all_boxes.append(per_class_boxes[keeps, :])
+          all_classes.append(per_class_classes[keeps])
+          all_prob.append(per_class_prob[keeps, :])
+
+        scores = np.vstack(all_scores)
+        boxes = np.vstack(all_boxes)
+        classes = np.vstack(all_classes).reshape(-1)
+        prob = np.vstack(all_prob)
+
+        if len(classes) is 0:
+            scores = np.zeros((1, 1))
+            boxes = np.array([[0.0, 0.0, 2.0, 2.0]])
+            classes = np.array([0]).reshape(-1)
+            prob = np.zeros((1,81))
+
+    batch_inds = np.zeros([boxes.shape[0]])
+
+    return boxes.astype(np.float32), classes.astype(np.int32), prob.astype(np.float32), batch_inds.astype(np.int32)
 
 def _jitter_boxes(boxes, jitter=0.1):
     """ jitter the boxes before appending them into rois
@@ -188,9 +345,10 @@ def _apply_nms(boxes, scores, threshold = 0.5):
 if __name__ == '__main__':
   import time
   t = time.time()
-  
-  for i in range(10):
-    N = 200000
+
+  for i in range(100):
+    
+    N = 120000
     boxes = np.random.randint(0, 50, (N, 2))
     s = np.random.randint(10, 40, (N, 2))
     s = boxes + s
@@ -200,6 +358,8 @@ if __name__ == '__main__':
     # scores_ = 1 - np.random.rand(N, 1)
     # scores = np.hstack((scores, scores_))
   
-    boxes, scores = sample_rpn_outputs(boxes, scores, only_positive=False)
+    boxes, scores, batch_inds = sample_rpn_outputs(boxes, scores, only_positive=False)
+
+
   
   print ('average time %f' % ((time.time() - t) / 10))
