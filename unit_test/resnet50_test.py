@@ -36,7 +36,7 @@ with tf.Graph().as_default():
       image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = \
         coco.read('./data/coco/records/coco_train2014_00000-of-00040.tfrecord')
       with tf.control_dependencies([image, gt_boxes, gt_masks]):
-        image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training=True)
+        image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training=False)
       
       ##  network
       with slim.arg_scope(resnet_v1.resnet_arg_scope(weight_decay=0.0001)):
@@ -55,7 +55,7 @@ with tf.Graph().as_default():
         summaries.add(tf.summary.histogram('pyramid/hist/' + p, pyramid[p]))
         summaries.add(tf.summary.scalar('pyramid/means/'+ p, tf.reduce_mean(tf.abs(pyramid[p]))))
         
-      outputs = pyramid_network.build_heads(pyramid, ih, iw, num_classes=81, base_anchors=9, is_training=True, gt_boxes=gt_boxes)
+      outputs = pyramid_network.build_heads(pyramid, ih, iw, num_classes=81, base_anchors=9, is_training=False, gt_boxes=gt_boxes)
       
       ## losses
       loss, losses, batch_info = pyramid_network.build_losses(pyramid, outputs,

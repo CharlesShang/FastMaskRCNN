@@ -21,8 +21,24 @@ def anchors_plane(height, width, stride = 1.0,
   # ratios = kwargs.setdefault('ratios', [0.5, 1, 2.0])
   # base = kwargs.setdefault('base', 16)
   anc = anchors(scales, ratios, base)
-  all_anchors = cython_anchor.anchors_plane(height, width, stride, anc)
+  all_anchors = cython_anchor.anchors_plane(height, width, stride, anc).astype(np.float32)
   return all_anchors
+
+def jitter_gt_boxes(gt_boxes, jitter=0.1):
+  """ jitter the gtboxes, before adding them into rois, to be more robust for cls and rgs
+  gt_boxes: (G, 5) [x1 ,y1 ,x2, y2, class] int
+  """
+  jittered_boxes = gt_boxes.copy()
+  ws = jittered_boxes[:, 2] - jittered_boxes[:, 0] + 1.0
+  hs = jittered_boxes[:, 3] - jittered_boxes[:, 1] + 1.0
+  width_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * ws
+  height_offset = (np.random.rand(jittered_boxes.shape[0]) - 0.5) * jitter * hs
+  jittered_boxes[:, 0] += width_offset
+  jittered_boxes[:, 2] += width_offset
+  jittered_boxes[:, 1] += height_offset
+  jittered_boxes[:, 3] += height_offset
+
+  return jittered_boxes
 
 # Written by Ross Girshick and Sean Bell
 def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
@@ -35,7 +51,7 @@ def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
   base_anchor = np.array([1, 1, base_size, base_size]) - 1
   ratio_anchors = _ratio_enum(base_anchor, ratios)
   anchors = np.vstack([_scale_enum(ratio_anchors[i, :], scales)
-                       for i in xrange(ratio_anchors.shape[0])])
+                       for i in range(ratio_anchors.shape[0])])
   return anchors
 
 def _whctrs(anchor):

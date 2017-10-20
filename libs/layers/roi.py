@@ -35,13 +35,13 @@ def encode(gt_boxes, rois, num_classes):
       # R x G matrix
       overlaps = cython_bbox.bbox_overlaps(
         np.ascontiguousarray(all_rois[:, 0:4], dtype=np.float),
-        np.ascontiguousarray(gt_boxes[:, :4], dtype=np.float))
+        np.ascontiguousarray(gt_boxes[:, 0:4], dtype=np.float))
       gt_assignment = overlaps.argmax(axis=1)  # R
       # max_overlaps = overlaps.max(axis=1)      # R
       max_overlaps = overlaps[np.arange(rois.shape[0]), gt_assignment]
       # note: this will assign every rois with a positive label 
       # labels = gt_boxes[gt_assignment, 4]
-      labels = np.zeros([num_rois], dtype=np.float32)
+      labels = np.zeros([num_rois], dtype=np.int32)
       labels[:] = -1
 
       # if _DEBUG:
@@ -53,49 +53,42 @@ def encode(gt_boxes, rois, num_classes):
       fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
       if fg_inds.size > 0 and fg_rois < fg_inds.size:
         fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
-      labels[fg_inds] = gt_boxes[gt_assignment[fg_inds], 4] 
+      labels[fg_inds] = gt_boxes[gt_assignment[fg_inds], 4]
       
       # TODO: sampling strategy
       bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 64)
+      bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 128-fg_rois)#64
       if bg_inds.size > 0 and bg_rois < bg_inds.size:
         bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
       labels[bg_inds] = 0
       
       # ignore rois with overlaps between fg_threshold and bg_threshold 
-      ignore_inds = np.where(((max_overlaps > cfg.FLAGS.bg_threshold) &\
+      ignore_inds = np.where(((max_overlaps >= cfg.FLAGS.bg_threshold) &\
               (max_overlaps < cfg.FLAGS.fg_threshold)))[0]
       labels[ignore_inds] = -1 
 
       keep_inds = np.append(fg_inds, bg_inds)
-      if _DEBUG: 
-          print ('keep_inds')
-          print (keep_inds)
-          print ('fg_inds')
-          print (fg_inds)
-          print ('bg_inds')
-          print (bg_inds)
-          print ('bg_rois:', bg_rois)
-          print ('cfg.FLAGS.bg_threshold:', cfg.FLAGS.bg_threshold)
-          # print (max_overlaps)
-
-          LOG('ROIEncoder: %d positive rois, %d negative rois' % (len(fg_inds), len(bg_inds)))
 
       bbox_targets, bbox_inside_weights = _compute_targets(
-        rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
-      bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
-      bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
+         rois, gt_boxes[gt_assignment, :4], labels, num_classes)
+
+      # bbox_targets, bbox_inside_weights = _compute_targets(
+      #   rois[keep_inds, 0:4], gt_boxes[gt_assignment[keep_inds], :4], labels[keep_inds], num_classes)
+      # bbox_targets = _unmap(bbox_targets, num_rois, keep_inds, 0)
+      # bbox_inside_weights = _unmap(bbox_inside_weights, num_rois, keep_inds, 0)
    
   else:
       # there is no gt
-      labels = np.zeros((num_rois, ), np.float32)
+      labels = np.zeros((num_rois, ), np.int32)
       bbox_targets = np.zeros((num_rois, 4 * num_classes), np.float32)
       bbox_inside_weights = np.zeros((num_rois, 4 * num_classes), np.float32)
-      bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 64)
+      bg_rois  = min(int(cfg.FLAGS.rois_per_image * (1 - cfg.FLAGS.fg_roi_fraction)), 128)#64
+
       if bg_rois < num_rois:
           bg_inds = np.arange(num_rois)
           ignore_inds = np.random.choice(bg_inds, size=num_rois - bg_rois, replace=False)
           labels[ignore_inds] = -1 
+      max_overlaps = labels
 
   return labels, bbox_targets, bbox_inside_weights
 
@@ -149,7 +142,7 @@ def _compute_targets(ex_rois, gt_rois, labels, num_classes):
     start = 4 * cls
     end = start + 4
     bbox_targets[ind, start:end] = targets[ind, 0:4]
-    bbox_inside_weights[ind, start:end] = 1
+    bbox_inside_weights[ind, start:end] = 1.0
   return bbox_targets, bbox_inside_weights
 
 def _unmap(data, count, inds, fill=0):

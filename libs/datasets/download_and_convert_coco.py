@@ -31,8 +31,7 @@ _DATA_URLS=[
 ]
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_boolean('vis',  False,
-                          'Show some visual masks')
+tf.app.flags.DEFINE_boolean('vis',  False, 'Show some visual masks')
 
 
 def download_and_uncompress_zip(zip_url, dataset_dir):
@@ -218,8 +217,11 @@ def _get_coco_masks(coco, img_id, height, width, img_name):
   if bboxes.shape[0] <= 0:
     bboxes = np.zeros([0, 4], dtype=np.float32)
     classes = np.zeros([0], dtype=np.float32)
-    print ('None Annotations %s' % img_name)
-    LOG('None Annotations %s' % img_name)
+    #print ('None Annotations %s' % img_name)
+    #LOG('None Annotations %s' % img_name)
+    no_annotation_flag = True
+  else:
+    no_annotation_flag = False
   bboxes[:, 2] = bboxes[:, 0] + bboxes[:, 2]
   bboxes[:, 3] = bboxes[:, 1] + bboxes[:, 3]
   gt_boxes = np.hstack((bboxes, classes[:, np.newaxis]))
@@ -228,7 +230,7 @@ def _get_coco_masks(coco, img_id, height, width, img_name):
   mask = mask.astype(np.uint8)
   assert masks.shape[0] == gt_boxes.shape[0], 'Shape Error'
   
-  return gt_boxes, masks, mask
+  return gt_boxes, masks, mask, no_annotation_flag
   
 
 
@@ -286,11 +288,24 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
             
             # jump over the damaged images
             if str(img_id) == '320612':
+              sys.stdout.write('\r>> skipping image %d/%d shard %d\n' % (
+                  i + 1, len(imgs), shard_id))
+              sys.stdout.flush()
               continue
             
             # process anns
             height, width = imgs[i][1]['height'], imgs[i][1]['width']
-            gt_boxes, masks, mask = _get_coco_masks(coco, img_id, height, width, img_name)
+            if float(height)/float(width) > 3.02 or float(width)/float(height) > 3.02:
+              sys.stdout.write('\r>> skipping image %d/%d shard %d height:%d width:%d\n' % (
+                  i + 1, len(imgs), shard_id, height, width))
+              sys.stdout.flush()
+              continue
+            gt_boxes, masks, mask, no_annotation_flag = _get_coco_masks(coco, img_id, height, width, img_name)
+            if no_annotation_flag is True:
+              sys.stdout.write('\r>> skipping image %d/%d shard %d no annotation \n' % (
+                  i + 1, len(imgs), shard_id))
+              sys.stdout.flush()
+              continue
             
             # read image as RGB numpy
             img = np.array(Image.open(img_name))
@@ -305,15 +320,16 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
 
             img_raw = img.tostring()
             mask_raw = mask.tostring()
-            
+
             example = _to_tfexample_coco_raw(
               img_id,
               img_raw,
               mask_raw,
               height, width, gt_boxes.shape[0],
               gt_boxes.tostring(), masks.tostring())
-            
+
             tfrecord_writer.write(example.SerializeToString())
+
   sys.stdout.write('\n')
   sys.stdout.flush()
 
@@ -402,7 +418,12 @@ def _add_to_tfrecord_trainvalsplit(record_dir, image_dir, annotation_dir, split_
             height, width = imgs[i][1]['height'], imgs[i][1]['width']
             coco = coco_train if i < num_of_train else coco_val
 
-            gt_boxes, masks, mask = _get_coco_masks(coco, img_id, height, width, img_name)
+            gt_boxes, masks, mask, no_annotation_flag = _get_coco_masks(coco, img_id, height, width, img_name)
+            if no_annotation_flag is True:
+              sys.stdout.write('\r>> skipping image %d/%d shard %d no annotation \n' % (
+                  i + 1, len(imgs), shard_id))
+              sys.stdout.flush()
+              continue
             
             # read image as RGB numpy
             img = np.array(Image.open(img_name))
