@@ -31,8 +31,7 @@ _DATA_URLS=[
 ]
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_boolean('vis',  False,
-                          'Show some visual masks')
+tf.app.flags.DEFINE_boolean('vis',  False, 'Show some visual masks')
 
 
 def download_and_uncompress_zip(zip_url, dataset_dir):
@@ -305,15 +304,16 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
 
             img_raw = img.tostring()
             mask_raw = mask.tostring()
-            
+
             example = _to_tfexample_coco_raw(
               img_id,
               img_raw,
               mask_raw,
               height, width, gt_boxes.shape[0],
               gt_boxes.tostring(), masks.tostring())
-            
+
             tfrecord_writer.write(example.SerializeToString())
+
   sys.stdout.write('\n')
   sys.stdout.flush()
 

@@ -123,7 +123,9 @@ def _filter_negative_samples(labels, tensors):
 
     filtered = []
     for t in tensors:
-        tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0])
+        # tf.assert_equal(tf.shape(t)[0], tf.shape(labels)[0]) - I removed this assertion because it was never used.
+        # assertion is not automatically checked you should execute it in graph as any other operation
+
         f = tf.gather(t, keeps)
         filtered.append(f)
 

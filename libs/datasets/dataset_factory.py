@@ -16,6 +16,8 @@ def get_dataset(dataset_name, split_name, dataset_dir,
         file_pattern = dataset_name + '_' + split_name + '*.tfrecord' 
 
     tfrecords = glob.glob(dataset_dir + '/records/' + file_pattern)
+    assert len(tfrecords)>0, "haven't found any tfrecord(did you run train.py from code root?). we were looking at %s." % dataset_dir + '/records/' + file_pattern
+
     image, ih, iw, gt_boxes, gt_masks, num_instances, img_id = coco.read(tfrecords)
 
     image, gt_boxes, gt_masks = coco_preprocess.preprocess_image(image, gt_boxes, gt_masks, is_training)
