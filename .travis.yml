@@ -1,0 +1,51 @@
+# vim ft=yaml
+
+# After changing this file, check it on:
+#   http://yaml-online-parser.appspot.com/
+
+# See doc/travis_notes.txt for some guidelines
+
+env:
+  global:
+    - CODACY_PROJECT_TOKEN=5014f0b8102a4c2b9a5547320f0a725d
+
+language: python
+
+sudo: true
+
+python:
+  - 2.7
+  - 3.4
+  - 3.5
+  - 3.6
+
+# See http://docs.travis-ci.com/user/caching/#pip-cache
+cache: pip
+
+before_install:
+  - pip install --upgrade pip
+
+install:
+  - root=$PWD
+  - pip install -r requirements.txt
+  - pip install nose>=1.3.7 coverage codecov pytest>=3.0.5 codacy-coverage
+
+before_script:
+  - cd $root/libs/datasets/pycocotools && make
+  - cd $root/libs && make
+  - cd $root
+
+#  - wget http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz
+#  - unzip resnet_v1_50*.tar.gz
+
+script:
+  # - pytest -v --doctest-modules
+  - nosetests -v --exe --with-doctest --with-xunit --with-coverage --cover-package=libs train
+
+after_success:
+  # - codecov  # public repository on Travis CI
+  # private repository on Travis CI
+  - codecov -t 48731226-a0b2-4360-8575-e2839df0739c
+  - coverage xml
+  - python-codacy-coverage -r coverage.xml
+  - coverage report

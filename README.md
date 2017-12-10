@@ -1,4 +1,9 @@
 # Mask RCNN
+
+[![Build Status](https://travis-ci.org/Borda/FastMaskRCNN.svg?branch=master)](https://travis-ci.org/Borda/FastMaskRCNN)
+[![codecov](https://codecov.io/gh/Borda/FastMaskRCNN/branch/master/graph/badge.svg)](https://codecov.io/gh/Borda/FastMaskRCNN)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/0a75e1825b584ea295dd77c7f8a014dd)](https://www.codacy.com/app/Borda/FastMaskRCNN?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Borda/FastMaskRCNN&amp;utm_campaign=Badge_Grade)
+
 Mask RCNN in TensorFlow
 
 This repo attempts to reproduce this amazing work by Kaiming He et al. : 
