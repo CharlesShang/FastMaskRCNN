@@ -13,24 +13,25 @@ import tensorflow.contrib.slim as slim
 from time import gmtime, strftime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-import libs.configs.config_v1 as cfg
+# import libs.configs.config_v1 as cfg
 import libs.datasets.dataset_factory as datasets
 import libs.nets.nets_factory as network 
 
-import libs.preprocessings.coco_v1 as coco_preprocess
+# import libs.preprocessings.coco_v1 as coco_preprocess
 import libs.nets.pyramid_network as pyramid_network
 import libs.nets.resnet_v1 as resnet_v1
 
 from train.train_utils import _configure_learning_rate, _configure_optimizer, \
-  _get_variables_to_train, _get_init_fn, get_var_list_to_restore
+  _get_variables_to_train, get_var_list_to_restore  #, _get_init_fn
 
-from PIL import Image, ImageFont, ImageDraw, ImageEnhance
-from libs.datasets import download_and_convert_coco
+# from PIL import Image, ImageFont, ImageDraw, ImageEnhance
+# from libs.datasets import download_and_convert_coco
 #from libs.datasets.download_and_convert_coco import _cat_id_to_cls_name
 from libs.visualization.pil_utils import cat_id_to_cls_name, draw_img, draw_bbox
 
 FLAGS = tf.app.flags.FLAGS
 resnet50 = resnet_v1.resnet_v1_50
+
 
 def solve(global_step):
     """add solver to losses"""
@@ -65,6 +66,7 @@ def solve(global_step):
         update_ops.append(update_bn)
 
     return tf.group(*update_ops)
+
 
 def restore(sess):
      """choose which param to restore"""
@@ -158,7 +160,8 @@ def restore(sess):
         except:
            print ('Checking your params %s' %(checkpoint_path))
            raise
-    
+
+
 def train():
     """The main function that runs training"""
 
@@ -260,15 +263,17 @@ def train():
         start_time = time.time()
 
         s_, tot_loss, reg_lossnp, img_id_str, \
-        rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss, \
-        gt_boxesnp, \
-        rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch, \
-        input_imagenp, final_boxnp, final_clsnp, final_probnp, final_gt_clsnp, gtnp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np= \
+        rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, \
+        mask_loss, gt_boxesnp, \
+        rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, \
+        mask_batch_pos, mask_batch, input_imagenp, \
+        final_boxnp, final_clsnp, final_probnp, final_gt_clsnp, \
+        gtnp, tmp_0np, tmp_1np, tmp_2np, tmp_3np, tmp_4np= \
                      sess.run([update_op, total_loss, regular_loss, img_id] + 
-                              losses + 
-                              [gt_boxes] + 
-                              batch_info + 
-                              [input_image] + [final_box] + [final_cls] + [final_prob] + [final_gt_cls] + [gt] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4])
+                              losses + [gt_boxes] +
+                              batch_info + [input_image] + [final_box] + [final_cls] +
+                              [final_prob] + [final_gt_cls] +
+                              [gt] + [tmp_0] + [tmp_1] + [tmp_2] + [tmp_3] + [tmp_4])
 
         duration_time = time.time() - start_time
         if step % 1 == 0: 
@@ -277,9 +282,11 @@ def train():
                     """instances: %d, """
                     """batch:(%d|%d, %d|%d, %d|%d)""" 
                    % (step, img_id_str, duration_time, reg_lossnp, 
-                      tot_loss, rpn_box_loss, rpn_cls_loss, refined_box_loss, refined_cls_loss, mask_loss,
+                      tot_loss, rpn_box_loss, rpn_cls_loss,
+                      refined_box_loss, refined_cls_loss, mask_loss,
                       gt_boxesnp.shape[0], 
-                      rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch, mask_batch_pos, mask_batch))
+                      rpn_batch_pos, rpn_batch, refine_batch_pos, refine_batch,
+                      mask_batch_pos, mask_batch))
 
             # draw_bbox(step, 
             #           np.uint8((np.array(input_imagenp[0])/2.0+0.5)*255.0), 
@@ -327,7 +334,8 @@ def train():
 
         if (step % 10000 == 0 or step + 1 == FLAGS.max_iters) and step != 0:
             checkpoint_path = os.path.join(FLAGS.train_dir, 
-                                           FLAGS.dataset_name + '_' + FLAGS.network + '_model.ckpt')
+                                           FLAGS.dataset_name + '_' +
+                                           FLAGS.network + '_model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 
         if coord.should_stop():

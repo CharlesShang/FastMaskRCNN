@@ -20,6 +20,7 @@ from libs.layers import sample_rpn_outputs
 from libs.layers import assign_boxes
 import  libs.configs.config_v1 as cfg
 
+
 class layer_test(object):
 
     def __init__(self, N, num_classes, height, width, gt_boxes=None, gt_masks=None, rois=None, classes=None):
@@ -103,6 +104,7 @@ class anchor_test(layer_test):
             for i in range(self.npboxes.shape[0]):
                 if self.npboxes[i, 4] >= 1:
                     print (bbox_targets_np[i], self.npboxes[i], all_anchors_np[i])
+
 
 class roi_test(layer_test):
 
@@ -189,6 +191,7 @@ class mask_test(layer_test):
                 print(i, 'label:', self.labels[i])
                 print (self.mask_targets[i, :, :, int(self.labels[i])])
 
+
 class sample_test(layer_test):
 
     def __init__(self, N, num_classes, height, width, gt_boxes=None, gt_masks=None, rois=None, classes=None):
@@ -208,6 +211,7 @@ class sample_test(layer_test):
             bs = np.hstack((self.boxes, self.scores))
             np.set_printoptions(precision=3, suppress=True)
             print (bs)
+
 
 class ROIAlign_test(layer_test):
 
@@ -241,6 +245,7 @@ class ROIAlign_test(layer_test):
             print (self.feats.shape)
             print (self.feats.reshape((self.N, pooled_height, pooled_width)))
 
+
 class assign_test(layer_test):
 
     def __init__(self, N, num_classes, height, width, gt_boxes=None, gt_masks=None, rois=None, classes=None):
@@ -268,6 +273,7 @@ class assign_test(layer_test):
             print (np.hstack((self.gt_boxes, indsn[:, np.newaxis])))
 
             print (ind1n, ind2n, ind3n, ind4n)
+
 
 if __name__ == '__main__':
     print ('##############################')

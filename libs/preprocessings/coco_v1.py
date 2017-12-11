@@ -69,6 +69,7 @@ def preprocess_for_training(image, gt_boxes, gt_masks):
 
     return image, gt_boxes, gt_masks 
 
+
 def preprocess_for_test(image, gt_boxes, gt_masks):
 
 

@@ -13,6 +13,7 @@ from libs.logs.log import LOG
 
 _DEBUG = False 
 
+
 def encode(gt_boxes, rois, num_classes):
   """Matching and Encoding groundtruth boxes (gt_boxes) into learning targets to boxes
   Sampling
@@ -99,6 +100,7 @@ def encode(gt_boxes, rois, num_classes):
 
   return labels, bbox_targets, bbox_inside_weights
 
+
 def decode(boxes, scores, rois, ih, iw):
   """Decode prediction targets into boxes and only keep only one boxes of greatest possibility for each rois
     Parameters
@@ -123,6 +125,7 @@ def decode(boxes, scores, rois, ih, iw):
     final_boxes[i, 0:4] = boxes[i, ind:ind+4]
   final_boxes = clip_boxes(final_boxes, (ih, iw))
   return final_boxes, classes, scores
+
 
 def _compute_targets(ex_rois, gt_rois, labels, num_classes):
   """
@@ -152,9 +155,10 @@ def _compute_targets(ex_rois, gt_rois, labels, num_classes):
     bbox_inside_weights[ind, start:end] = 1
   return bbox_targets, bbox_inside_weights
 
+
 def _unmap(data, count, inds, fill=0):
-  """ Unmap a subset of item (data) back to the original set of items (of
-  size count) """
+  """ Unmap a subset of item (data) back to the original set of items
+  (of size count) """
   if len(data.shape) == 1:
     ret = np.empty((count,), dtype=np.float32)
     ret.fill(fill)
@@ -164,6 +168,7 @@ def _unmap(data, count, inds, fill=0):
     ret.fill(fill)
     ret[inds, :] = data
   return ret
+
 
 if __name__ == '__main__':
   cfg.FLAGS.fg_threshold = 0.1

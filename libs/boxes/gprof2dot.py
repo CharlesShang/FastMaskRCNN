@@ -36,17 +36,23 @@ import json
 # Python 2.x/3.x compatibility
 if sys.version_info[0] >= 3:
     PYTHON_3 = True
-    def compat_iteritems(x): return x.items()  # No iteritems() in Python 3
-    def compat_itervalues(x): return x.values()  # No itervalues() in Python 3
-    def compat_keys(x): return list(x.keys())  # keys() is a generator in Python 3
+    def compat_iteritems(x): 
+        return x.items()  # No iteritems() in Python 3
+    def compat_itervalues(x): 
+        return x.values()  # No itervalues() in Python 3
+    def compat_keys(x): 
+        return list(x.keys())  # keys() is a generator in Python 3
     basestring = str  # No class basestring in Python 3
     unichr = chr # No unichr in Python 3
     xrange = range # No xrange in Python 3
 else:
     PYTHON_3 = False
-    def compat_iteritems(x): return x.iteritems()
-    def compat_itervalues(x): return x.itervalues()
-    def compat_keys(x): return x.keys()
+    def compat_iteritems(x): 
+        return x.iteritems()
+    def compat_itervalues(x): 
+        return x.itervalues()
+    def compat_keys(x): 
+        return x.keys()
 
 
 try:
@@ -67,17 +73,21 @@ MULTIPLICATION_SIGN = unichr(0xd7)
 def times(x):
     return "%u%s" % (x, MULTIPLICATION_SIGN)
 
+
 def percentage(p):
     return "%.02f%%" % (p*100.0,)
 
+
 def add(a, b):
     return a + b
+
 
 def fail(a, b):
     assert False
 
 
-tol = 2 ** -23
+TOLERANCE = 2 ** -23
+
 
 def ratio(numerator, denominator):
     try:
@@ -86,12 +96,14 @@ def ratio(numerator, denominator):
         # 0/0 is undefined, but 1.0 yields more useful results
         return 1.0
     if ratio < 0.0:
-        if ratio < -tol:
-            sys.stderr.write('warning: negative ratio (%s/%s)\n' % (numerator, denominator))
+        if ratio < -TOLERANCE:
+            sys.stderr.write('warning: negative ratio (%s/%s)\n'
+                             % (numerator, denominator))
         return 0.0
     if ratio > 1.0:
-        if ratio > 1.0 + tol:
-            sys.stderr.write('warning: ratio greater than one (%s/%s)\n' % (numerator, denominator))
+        if ratio > 1.0 + TOLERANCE:
+            sys.stderr.write('warning: ratio greater than one (%s/%s)\n'
+                             % (numerator, denominator))
         return 1.0
     return ratio
 
@@ -295,7 +307,8 @@ class Profile(Object):
 
     def add_function(self, function):
         if function.id in self.functions:
-            sys.stderr.write('warning: overwriting function %s (id %s)\n' % (function.name, str(function.id)))
+            sys.stderr.write('warning: overwriting function %s (id %s)\n'
+                             % (function.name, str(function.id)))
         self.functions[function.id] = function
 
     def add_cycle(self, cycle):
@@ -308,7 +321,9 @@ class Profile(Object):
             for callee_id in compat_keys(function.calls):
                 assert function.calls[callee_id].callee_id == callee_id
                 if callee_id not in self.functions:
-                    sys.stderr.write('warning: call to undefined function %s from function %s\n' % (str(callee_id), function.name))
+                    sys.stderr.write('warning: call to undefined function %s '
+                                     'from function %s\n' % (str(callee_id),
+                                                             function.name))
                     del function.calls[callee_id]
 
     def find_cycles(self):
@@ -370,7 +385,6 @@ class Profile(Object):
             f.calls = newCalls
             pathFunctions[n] = f
         self.functions = pathFunctions
-
 
     def getFunctionId(self, funcName):
         for f in self.functions:
@@ -446,7 +460,9 @@ class Profile(Object):
                         if callee.cycle is not None and callee.cycle is not function.cycle:
                             cycle_totals[callee.cycle] += call[event]
                     else:
-                        sys.stderr.write("call_ratios: No data for " + function.name + " call to " + callee.name + "\n")
+                        sys.stderr.write("call_ratios: No data for "
+                                         + function.name + " call to "
+                                         + callee.name + "\n")
 
         # Pass 2:  Compute the ratios.  Each call[event] is scaled by the
         #          function_total of the callee.  Calls into cycles use the
@@ -554,7 +570,9 @@ class Profile(Object):
                 partials = {}
                 self._rank_cycle_function(cycle, callee, ranks)
                 self._call_ratios_cycle(cycle, callee, ranks, call_ratios, set())
-                partial = self._integrate_cycle_function(cycle, callee, call_ratio, partials, ranks, call_ratios, outevent, inevent)
+                partial = self._integrate_cycle_function(
+                    cycle, callee, call_ratio, partials, ranks, call_ratios,
+                    outevent, inevent)
                 assert partial == max(partials.values())
                 assert abs(call_ratio*total - partial) <= 0.001*call_ratio*total
 
@@ -631,7 +649,9 @@ class Profile(Object):
                         partial += partial_ratio*call[outevent]
                     else:
                         if ranks[callee] > ranks[function]:
-                            callee_partial = self._integrate_cycle_function(cycle, callee, partial_ratio, partials, ranks, call_ratios, outevent, inevent)
+                            callee_partial = self._integrate_cycle_function(
+                                cycle, callee, partial_ratio, partials, ranks,
+                                call_ratios, outevent, inevent)
                             call_ratio = ratio(call.ratio, call_ratios[callee])
                             call_partial = call_ratio*callee_partial
                             try:
@@ -704,7 +724,8 @@ class Profile(Object):
         for function in compat_itervalues(self.functions):
             for callee_id in compat_keys(function.calls):
                 call = function.calls[callee_id]
-                if callee_id not in self.functions or call.weight is not None and call.weight < edge_thres:
+                if callee_id not in self.functions \
+                        or call.weight is not None and call.weight < edge_thres:
                     del function.calls[callee_id]
 
         if colour_nodes_by_selftime:
@@ -916,7 +937,7 @@ XML_ELEMENT_START, XML_ELEMENT_END, XML_CHARACTER_DATA, XML_EOF = range(4)
 
 class XmlToken:
 
-    def __init__(self, type, name_or_data, attrs = None, line = None, column = None):
+    def __init__(self, type, name_or_data, attrs=None, line=None, column=None):
         assert type in (XML_ELEMENT_START, XML_ELEMENT_END, XML_CHARACTER_DATA, XML_EOF)
         self.type = type
         self.name_or_data = name_or_data
@@ -975,7 +996,8 @@ class XmlTokenizer:
         if self.character_data:
             if not self.skip_ws or not self.character_data.isspace(): 
                 line, column = self.character_pos
-                token = XmlToken(XML_CHARACTER_DATA, self.character_data, None, line, column)
+                token = XmlToken(XML_CHARACTER_DATA, self.character_data,
+                                 None, line, column)
                 self.tokens.append(token)
             self.character_data = ''
     
@@ -1531,7 +1553,8 @@ class AXEParser(Parser):
             line = self.readline()
 
     def parse(self):
-        sys.stderr.write('warning: for axe format, edge weights are unreliable estimates derived from function total times.\n')
+        sys.stderr.write('warning: for axe format, edge weights are unreliable'
+                         ' estimates derived from function total times.\n')
         self.parse_cg()
         self.fp.close()
 
@@ -1572,7 +1595,8 @@ class AXEParser(Parser):
                 try:
                     cycle = cycles[entry.cycle]
                 except KeyError:
-                    sys.stderr.write('warning: <cycle %u as a whole> entry missing\n' % entry.cycle) 
+                    sys.stderr.write('warning: <cycle %u as a whole> '
+                                     'entry missing\n' % entry.cycle)
                     cycle = Cycle()
                     cycles[entry.cycle] = cycle
                 cycle.add_function(function)
@@ -2959,7 +2983,8 @@ class DotWriter:
         nodestyle = theme.node_style()
 
         self.attr('graph', fontname=fontname, ranksep=0.25, nodesep=0.125)
-        self.attr('node', fontname=fontname, shape="box", style=nodestyle, fontcolor=fontcolor, width=0, height=0)
+        self.attr('node', fontname=fontname, shape="box", style=nodestyle,
+                  fontcolor=fontcolor, width=0, height=0)
         self.attr('edge', fontname=fontname)
 
         for _, function in sorted_iteritems(profile.functions):
@@ -3152,7 +3177,9 @@ def main():
         '--total',
         type="choice", choices=('callratios', 'callstacks'),
         dest="totalMethod", default=totalMethod,
-        help="preferred method of calculating total time: callratios or callstacks (currently affects only perf format) [default: %default]")
+        help="preferred method of calculating total time: "
+             "callratios or callstacks (currently affects only perf format) "
+             "[default: %default]")
     optparser.add_option(
         '-c', '--colormap',
         type="choice", choices=('color', 'pink', 'gray', 'bw', 'print'),
@@ -3167,7 +3194,8 @@ def main():
         '--colour-nodes-by-selftime',
         action="store_true",
         dest="colour_nodes_by_selftime", default=False,
-        help="colour nodes by self time, rather than by total time (sum of self and descendants)")
+        help="colour nodes by self time, rather than by total time "
+             "(sum of self and descendants)")
     optparser.add_option(
         '-w', '--wrap',
         action="store_true",
@@ -3193,7 +3221,9 @@ def main():
     optparser.add_option(
         '--skew',
         type="float", dest="theme_skew", default=1.0,
-        help="skew the colorization curve.  Values < 1.0 give more variety to lower percentages.  Values > 1.0 give less variety to lower percentages")
+        help="skew the colorization curve.  "
+             "Values < 1.0 give more variety to lower percentages.  "
+             "Values > 1.0 give less variety to lower percentages")
     (options, args) = optparser.parse_args(sys.argv[1:])
 
     if len(args) > 1 and options.format != 'pstats':
@@ -3225,11 +3255,13 @@ def main():
         parser = Format(fp)
     elif Format.multipleInput:
         if not args:
-            optparser.error('at least a file must be specified for %s input' % options.format)
+            optparser.error('at least a file must be specified '
+                            'for %s input' % options.format)
         parser = Format(*args)
     else:
         if len(args) != 1:
-            optparser.error('exactly one file must be specified for %s input' % options.format)
+            optparser.error('exactly one file must be specified '
+                            'for %s input' % options.format)
         parser = Format(args[0])
 
     profile = parser.parse()
@@ -3257,13 +3289,15 @@ def main():
     if options.root:
         rootId = profile.getFunctionId(options.root)
         if not rootId:
-            sys.stderr.write('root node ' + options.root + ' not found (might already be pruned : try -e0 -n0 flags)\n')
+            sys.stderr.write('root node ' + options.root
+                             + ' not found (might already be pruned : try -e0 -n0 flags)\n')
             sys.exit(1)
         profile.prune_root(rootId)
     if options.leaf:
         leafId = profile.getFunctionId(options.leaf)
         if not leafId:
-            sys.stderr.write('leaf node ' + options.leaf + ' not found (maybe already pruned : try -e0 -n0 flags)\n')
+            sys.stderr.write('leaf node ' + options.leaf
+                             + ' not found (maybe already pruned : try -e0 -n0 flags)\n')
             sys.exit(1)
         profile.prune_leaf(leafId)
 

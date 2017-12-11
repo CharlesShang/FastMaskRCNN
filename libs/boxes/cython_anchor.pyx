@@ -11,6 +11,7 @@ cimport numpy as np
 DTYPE = np.float
 ctypedef np.float_t DTYPE_t
 
+
 def anchors_plane(
         int height, int width, int stride,
         np.ndarray[DTYPE_t, ndim=2] anchors_base):

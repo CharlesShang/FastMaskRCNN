@@ -5,9 +5,11 @@ from __future__ import print_function
 import numpy as np
 from libs.boxes import cython_anchor
 
+
 def anchors(scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16):
   """Get a set of anchors at one position """
   return generate_anchors(base_size=base, scales=np.asarray(scales, np.int32), ratios=ratios)
+
 
 def anchors_plane(height, width, stride = 1.0, 
         scales=[2, 4, 8, 16, 32], ratios=[0.5, 1, 2.0], base=16):
@@ -24,6 +26,7 @@ def anchors_plane(height, width, stride = 1.0,
   all_anchors = cython_anchor.anchors_plane(height, width, stride, anc)
   return all_anchors
 
+
 # Written by Ross Girshick and Sean Bell
 def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
                      scales=2 ** np.arange(3, 6)):
@@ -37,6 +40,7 @@ def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
   anchors = np.vstack([_scale_enum(ratio_anchors[i, :], scales)
                        for i in xrange(ratio_anchors.shape[0])])
   return anchors
+
 
 def _whctrs(anchor):
   """
@@ -90,6 +94,7 @@ def _scale_enum(anchor, scales):
   anchors = _mkanchors(ws, hs, x_ctr, y_ctr)
   return anchors
 
+
 def _unmap(data, count, inds, fill=0):
   """ Unmap a subset of item (data) back to the original set of items (of
   size count) """
@@ -102,6 +107,7 @@ def _unmap(data, count, inds, fill=0):
     ret.fill(fill)
     ret[inds, :] = data
   return ret
+
 
 if __name__ == '__main__':
   import time

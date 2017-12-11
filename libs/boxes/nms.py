@@ -7,6 +7,7 @@
 
 import numpy as np
 
+
 def nms(dets, thresh):
     x1 = dets[:, 0]
     y1 = dets[:, 1]

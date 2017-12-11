@@ -8,9 +8,11 @@ import cv2
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.logs.log import LOG
-from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
+from libs.boxes.bbox_transform import clip_boxes  #, bbox_transform, bbox_transform_inv
 
-_DEBUG = False 
+_DEBUG = False
+
+
 def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
   """Encode masks groundtruth into learnable targets
   Sample some exmaples
@@ -83,6 +85,7 @@ def encode(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width):
       mask_inside_weights = np.zeros((total_masks, mask_height, mask_height, num_classes), dtype=np.float32)
   return labels, mask_targets, mask_inside_weights
 
+
 def decode(mask_targets, rois, classes, ih, iw):
   """Decode outputs into final masks
   Params
@@ -116,7 +119,6 @@ def decode(mask_targets, rois, classes, ih, iw):
   return Mask
 
 
-
 if __name__ == '__main__':
   
   import time
@@ -140,7 +142,8 @@ if __name__ == '__main__':
       ])
     rois = gt_boxes[:, :4]
     print (rois)
-    rois, labels, mask_targets, mask_inside_weights = encode(gt_masks, gt_boxes, rois, 3, 7, 7)
+    rois, labels, mask_targets, mask_inside_weights = encode(
+        gt_masks, gt_boxes, rois, 3, 7, 7)
     print (rois)
     Mask = decode(mask_targets, rois, labels, H, W)
     if True:
@@ -150,4 +153,3 @@ if __name__ == '__main__':
       time.sleep(2)
   print(labels)
   print('average time: %f' % ((time.time() - t) / 10.0))
-  

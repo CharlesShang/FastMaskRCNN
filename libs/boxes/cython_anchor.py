@@ -2,7 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sys, pkg_resources, imp
+import pkg_resources, imp
+
 
 def __bootstrap__():
   global __bootstrap__, __loader__, __file__

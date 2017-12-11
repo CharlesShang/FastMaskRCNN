@@ -11,6 +11,7 @@ import libs.configs.config_v1 as cfg
 slim = tf.contrib.slim
 FLAGS = tf.app.flags.FLAGS
 
+
 def _configure_optimizer(learning_rate):
   """Configures the optimizer used for training.
 
@@ -62,6 +63,7 @@ def _configure_optimizer(learning_rate):
     raise ValueError('Optimizer [%s] was not recognized', FLAGS.optimizer)
   return optimizer
 
+
 def _configure_learning_rate(num_samples_per_epoch, global_step):
   """Configures the learning rate.
 
@@ -101,6 +103,7 @@ def _configure_learning_rate(num_samples_per_epoch, global_step):
     raise ValueError('learning_rate_decay_type [%s] was not recognized',
                      FLAGS.learning_rate_decay_type)
 
+
 def _get_variables_to_train():
   """Returns a list of variables to train.
 
@@ -117,6 +120,7 @@ def _get_variables_to_train():
     variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
     variables_to_train.extend(variables)
   return variables_to_train
+
 
 def _get_init_fn():
   """Returns a function run by the chief worker to warm-start the training.
@@ -163,6 +167,7 @@ def _get_init_fn():
       checkpoint_path,
       variables_to_restore,
       ignore_missing_vars=FLAGS.ignore_missing_vars)
+
 
 def get_var_list_to_restore():
   """Choose which vars to restore, ignore vars by setting --checkpoint_exclude_scopes """

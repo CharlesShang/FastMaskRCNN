@@ -7,11 +7,12 @@ import numpy as np
 import libs.boxes.cython_bbox as cython_bbox
 import libs.configs.config_v1 as cfg
 from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
-from libs.boxes.anchor import anchors_plane
+# from libs.boxes.anchor import anchors_plane
 from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
 _DEBUG = False
+
 
 def encode(gt_boxes, all_anchors, height, width, stride):
   """Matching and Encoding groundtruth into learning targets
@@ -86,11 +87,13 @@ def encode(gt_boxes, all_anchors, height, width, stride):
            max_ov = np.max(gt_max_overlaps)
            mean_ov = np.mean(gt_max_overlaps)
            if min_ov < cfg.FLAGS.bg_threshold:
-               LOG('ANCHOREncoder: overlaps: (min %.3f mean:%.3f max:%.3f), stride: %d, shape:(h:%d, w:%d)' 
+               LOG('ANCHOREncoder: overlaps: (min %.3f mean:%.3f max:%.3f), '
+                   'stride: %d, shape:(h:%d, w:%d)'
                        % (min_ov, mean_ov, max_ov, stride, height, width))
                worst = gt_boxes[np.argmin(gt_max_overlaps)]
                anc = anchors[gt_argmax_overlaps[np.argmin(gt_max_overlaps)], :]
-               LOG('ANCHOREncoder: worst case: overlap: %.3f, box:(%.1f, %.1f, %.1f, %.1f %d), anchor:(%.1f, %.1f, %.1f, %.1f)'
+               LOG('ANCHOREncoder: worst case: overlap: %.3f, '
+                   'box:(%.1f, %.1f, %.1f, %.1f %d), anchor:(%.1f, %.1f, %.1f, %.1f)'
                        % (min_ov, worst[0], worst[1], worst[2], worst[3], worst[4],
                           anc[0], anc[1], anc[2], anc[3]))
            
@@ -103,7 +106,8 @@ def encode(gt_boxes, all_anchors, height, width, stride):
       num_fg = int(cfg.FLAGS.fg_rpn_fraction * cfg.FLAGS.rpn_batch_size)
       fg_inds = np.where(labels == 1)[0]
       if len(fg_inds) > num_fg:
-        disable_inds = np.random.choice(fg_inds, size=(len(fg_inds) - num_fg), replace=False)
+        disable_inds = np.random.choice(fg_inds, size=(len(fg_inds) - num_fg),
+                                        replace=False)
         labels[disable_inds] = -1
   else:
       # if there is no gt
@@ -115,7 +119,8 @@ def encode(gt_boxes, all_anchors, height, width, stride):
   num_bg = max(min(cfg.FLAGS.rpn_batch_size - num_fg, num_fg * 3), 8)
   bg_inds = np.where(labels == 0)[0]
   if len(bg_inds) > num_bg:
-    disable_inds = np.random.choice(bg_inds, size=(len(bg_inds) - num_bg), replace=False)
+    disable_inds = np.random.choice(bg_inds, size=(len(bg_inds) - num_bg),
+                                    replace=False)
     labels[disable_inds] = -1
 
   bbox_targets = np.zeros((total_anchors, 4), dtype=np.float32)
@@ -134,6 +139,7 @@ def encode(gt_boxes, all_anchors, height, width, stride):
   bbox_inside_weights = bbox_inside_weights.reshape((1, height, width, -1))
 
   return labels, bbox_targets, bbox_inside_weights
+
 
 def decode(boxes, scores, all_anchors, ih, iw):
   """Decode outputs into boxes
@@ -165,6 +171,7 @@ def decode(boxes, scores, all_anchors, ih, iw):
   final_boxes = clip_boxes(final_boxes, (ih, iw))
   classes = classes.astype(np.int32)
   return final_boxes, classes, scores
+
 
 def sample(boxes, scores, ih, iw, is_training):
   """
@@ -199,7 +206,8 @@ def _unmap(data, count, inds, fill=0):
     ret.fill(fill)
     ret[inds, :] = data
   return ret
-  
+
+
 def _compute_targets(ex_rois, gt_rois):
   """Compute bounding-box regression targets for an image."""
 
@@ -208,6 +216,7 @@ def _compute_targets(ex_rois, gt_rois):
   assert gt_rois.shape[1] == 5
 
   return bbox_transform(ex_rois, gt_rois[:, :4]).astype(np.float32, copy=False)
+
 
 if __name__ == '__main__':
   
@@ -227,10 +236,14 @@ if __name__ == '__main__':
     s = np.random.randint(0, 20, (20, 2))
     s = rois + s
     rois = np.concatenate((rois, s), axis=1)
-    labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=200, width=300, stride=4)
-    labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=100, width=150, stride=8)
-    labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=50, width=75, stride=16)
-    labels, bbox_targets, bbox_inside_weights = encode(gt_boxes, all_anchors=None, height=25, width=37, stride=32)
+    labels, bbox_targets, bbox_inside_weights = encode(
+        gt_boxes, all_anchors=None, height=200, width=300, stride=4)
+    labels, bbox_targets, bbox_inside_weights = encode(
+        gt_boxes, all_anchors=None, height=100, width=150, stride=8)
+    labels, bbox_targets, bbox_inside_weights = encode(
+        gt_boxes, all_anchors=None, height=50, width=75, stride=16)
+    labels, bbox_targets, bbox_inside_weights = encode(
+        gt_boxes, all_anchors=None, height=25, width=37, stride=32)
     # anchors, _, _ = anchors_plane(200, 300, stride=4, boarder=0)
   
   print('average time: %f' % ((time.time() - t)/10.0))

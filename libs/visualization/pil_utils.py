@@ -5,6 +5,7 @@ from PIL import Image, ImageFont, ImageDraw, ImageEnhance
 FLAGS = tf.app.flags.FLAGS
 _DEBUG = False
 
+
 def draw_img(step, image, name='', image_height=1, image_width=1, rois=None):
     #print("image")
     #print(image)
@@ -13,9 +14,12 @@ def draw_img(step, image, name='', image_height=1, image_width=1, rois=None):
     #print("norm_image")
     #print(norm_image)
     source_img = Image.fromarray(norm_image)
-    return source_img.save(FLAGS.train_dir + 'test_' + name + '_' +  str(step) +'.jpg', 'JPEG')
+    return source_img.save(FLAGS.train_dir + 'test_' + name + '_'
+                           + str(step) +'.jpg', 'JPEG')
 
-def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, label=None, gt_label=None, prob=None):
+
+def draw_bbox(step, image, name='', image_height=1, image_width=1,
+              bbox=None, label=None, gt_label=None, prob=None):
     #print(prob[:,label])
     source_img = Image.fromarray(image)
     b, g, r = source_img.split()
@@ -28,7 +32,8 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
                 if prob is not None:
                     if (prob[i,label[i]] > 0.5) and (label[i] > 0):
                         if gt_label is not None:
-                            text  = cat_id_to_cls_name(label[i]) + ' : ' + cat_id_to_cls_name(gt_label[i])
+                            text  = cat_id_to_cls_name(label[i]) + ' : ' \
+                                    + cat_id_to_cls_name(gt_label[i])
                             if label[i] != gt_label[i]:
                                 color = '#ff0000'#draw.text((2+bbox[i,0], 2+bbox[i,1]), cat_id_to_cls_name(label[i]) + ' : ' + cat_id_to_cls_name(gt_label[i]), fill='#ff0000')
                             else:
@@ -50,19 +55,21 @@ def draw_bbox(step, image, name='', image_height=1, image_width=1, bbox=None, la
 
     return source_img.save(FLAGS.train_dir + '/est_imgs/test_' + name + '_' +  str(step) +'.jpg', 'JPEG')
 
+
 def cat_id_to_cls_name(catId):
-    cls_name = np.array([  'background', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
-                       'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
-                       'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
-                       'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-                       'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-                       'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
-                       'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-                       'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-                       'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-                       'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-                       'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
-                       'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven',
-                       'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
-                       'scissors', 'teddy bear', 'hair drier', 'toothbrush'])
+    cls_name = np.array([
+        'background', 'person', 'bicycle', 'car', 'motorcycle', 'airplane',
+        'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
+        'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
+        'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+        'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+        'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
+        'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+        'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+        'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
+        'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+        'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+        'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven',
+        'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+        'scissors', 'teddy bear', 'hair drier', 'toothbrush'])
     return cls_name[catId]

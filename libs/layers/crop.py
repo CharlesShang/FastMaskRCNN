@@ -4,7 +4,9 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-def crop(images, boxes, batch_inds, stride = 1, pooled_height = 7, pooled_width = 7, scope='ROIAlign'):
+
+def crop(images, boxes, batch_inds, stride=1,
+         pooled_height=7, pooled_width=7, scope='ROIAlign'):
   """Cropping areas of features into fixed size
   Params:
   --------
@@ -45,7 +47,9 @@ def crop(images, boxes, batch_inds, stride = 1, pooled_height = 7, pooled_width 
                                          method='bilinear',
                                          name='Crop')
 
-def crop_(images, boxes, batch_inds, ih, iw, stride = 1, pooled_height = 7, pooled_width = 7, scope='ROIAlign'):
+
+def crop_(images, boxes, batch_inds, ih=None, iw=None, stride=1,
+          pooled_height=7, pooled_width=7, scope='ROIAlign'):
   """Cropping areas of features into fixed size
   Params:
   --------
@@ -64,7 +68,7 @@ def crop_(images, boxes, batch_inds, ih, iw, stride = 1, pooled_height = 7, pool
 
     # normalize the boxes and swap x y dimensions
     shape = tf.shape(images)
-    boxes = tf.reshape(boxes, [-1, 2]) # to (x, y)
+    boxes = tf.reshape(boxes, [-1, 2])  # to (x, y)
     xs = boxes[:, 0] 
     ys = boxes[:, 1]
     xs = xs / tf.cast(shape[2], tf.float32)
@@ -85,4 +89,3 @@ def crop_(images, boxes, batch_inds, ih, iw, stride = 1, pooled_height = 7, pool
                                          [pooled_height, pooled_width],
                                          method='bilinear',
                                          name='Crop')] + [boxes]
-

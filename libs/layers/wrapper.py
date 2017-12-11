@@ -14,7 +14,9 @@ from . import sample
 from . import assign
 from libs.boxes.anchor import anchors_plane
 
-def anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEncoder'):
+
+def anchor_encoder(gt_boxes, all_anchors, height, width, stride,
+                   scope='AnchorEncoder'):
   
   with tf.name_scope(scope) as sc:
     labels, bbox_targets, bbox_inside_weights = \
@@ -23,7 +25,8 @@ def anchor_encoder(gt_boxes, all_anchors, height, width, stride, scope='AnchorEn
                  [tf.float32, tf.float32, tf.float32])
     labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='labels')
     bbox_targets = tf.convert_to_tensor(bbox_targets, name='bbox_targets')
-    bbox_inside_weights = tf.convert_to_tensor(bbox_inside_weights, name='bbox_inside_weights')
+    bbox_inside_weights = tf.convert_to_tensor(bbox_inside_weights,
+                                               name='bbox_inside_weights')
     labels = tf.reshape(labels, (1, height, width, -1))
     bbox_targets = tf.reshape(bbox_targets, (1, height, width, -1))
     bbox_inside_weights = tf.reshape(bbox_inside_weights, (1, height, width, -1))
@@ -79,6 +82,7 @@ def roi_decoder(boxes, scores, rois, ih, iw, scope='ROIDecoder'):
     
   return final_boxes, classes, scores
 
+
 def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width, scope='MaskEncoder'):
   
   with tf.name_scope(scope) as sc:
@@ -88,12 +92,14 @@ def mask_encoder(gt_masks, gt_boxes, rois, num_classes, mask_height, mask_width,
                  [tf.float32, tf.int32, tf.float32])
     labels = tf.convert_to_tensor(tf.cast(labels, tf.int32), name='classes')
     mask_targets = tf.convert_to_tensor(mask_targets, name='mask_targets')
-    mask_inside_weights = tf.convert_to_tensor(mask_inside_weights, name='mask_inside_weights')
+    mask_inside_weights = tf.convert_to_tensor(mask_inside_weights,
+                                               name='mask_inside_weights')
     labels = tf.reshape(labels, (-1,))
     mask_targets = tf.reshape(mask_targets, (-1, mask_height, mask_width, num_classes))
     mask_inside_weights = tf.reshape(mask_inside_weights, (-1, mask_height, mask_width, num_classes))
   
   return labels, mask_targets, mask_inside_weights
+
 
 def mask_decoder(mask_targets, rois, classes, ih, iw, scope='MaskDecoder'):
   
@@ -123,6 +129,7 @@ def sample_wrapper(boxes, scores, is_training=True, scope='SampleBoxes'):
   
   return boxes, scores, batch_inds
 
+
 def sample_with_gt_wrapper(boxes, scores, gt_boxes, is_training=True, scope='SampleBoxesWithGT'):
   
   with tf.name_scope(scope) as sc:
@@ -140,6 +147,7 @@ def sample_with_gt_wrapper(boxes, scores, gt_boxes, is_training=True, scope='Sam
   
   return boxes, scores, batch_inds, mask_boxes, mask_scores, mask_batch_inds
 
+
 def gen_all_anchors(height, width, stride, scales, scope='GenAnchors'):
   
   with tf.name_scope(scope) as sc:
@@ -148,10 +156,12 @@ def gen_all_anchors(height, width, stride, scales, scope='GenAnchors'):
                  [height, width, stride, scales],
                  [tf.float64]
                  )
-    all_anchors = tf.convert_to_tensor(tf.cast(all_anchors, tf.float32), name='AllAnchors')
+    all_anchors = tf.convert_to_tensor(tf.cast(all_anchors, tf.float32),
+                                       name='AllAnchors')
     all_anchors = tf.reshape(all_anchors, (height, width, -1))
     
     return all_anchors
+
 
 def assign_boxes(gt_boxes, tensors, layers, scope='AssignGTBoxes'):
 
