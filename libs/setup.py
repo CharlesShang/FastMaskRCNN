@@ -59,8 +59,9 @@ def locate_cuda():
 try:
     CUDA = locate_cuda()
     print (repr(CUDA))
-except:
+except EnvironmentError as err:
     CUDA = None
+    print ("Environment error({0}): {1}".format(err.errno, err.strerror))
 
 # Obtain the numpy include directory.  This logic works across numpy versions.
 try:
