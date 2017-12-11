@@ -188,7 +188,7 @@ class mask_test(layer_test):
             # print (self.mask_targets)
             print (self.labels)
             for i in range(rois.shape[0]):
-                print(i, 'label:', self.labels[i])
+                print (i, 'label:', self.labels[i])
                 print (self.mask_targets[i, :, :, int(self.labels[i])])
 
 
