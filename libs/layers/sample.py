@@ -2,16 +2,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
 
 import libs.configs.config_v1 as cfg
 import libs.boxes.nms_wrapper as nms_wrapper
 import libs.boxes.cython_bbox as cython_bbox
-from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
+# from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
 from libs.logs.log import LOG
 
 _DEBUG=False
+
 
 def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   """Sample boxes according to scores and some learning strategies
@@ -79,7 +80,9 @@ def sample_rpn_outputs(boxes, scores, is_training=False, only_positive=False):
   
   return boxes, scores.astype(np.float32), batch_inds
 
-def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, only_positive=False):
+
+def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes,
+                                    is_training=False, only_positive=False):
     """sample boxes for refined output"""
     boxes, scores, batch_inds = sample_rpn_outputs(boxes, scores, is_training, only_positive)
 
@@ -138,6 +141,7 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
     return boxes[keep_inds, :], scores[keep_inds], batch_inds[keep_inds],\
            boxes[mask_fg_inds, :], scores[mask_fg_inds], batch_inds[mask_fg_inds]
 
+
 def _jitter_boxes(boxes, jitter=0.1):
     """ jitter the boxes before appending them into rois
     """
@@ -153,6 +157,7 @@ def _jitter_boxes(boxes, jitter=0.1):
 
     return jittered_boxes
 
+
 def _filter_boxes(boxes, min_size):
   """Remove all boxes with any side smaller than min_size."""
   ws = boxes[:, 2] - boxes[:, 0] + 1
@@ -160,7 +165,8 @@ def _filter_boxes(boxes, min_size):
   keep = np.where((ws >= min_size) & (hs >= min_size))[0]
   return keep
 
-def _apply_nms(boxes, scores, threshold = 0.5):
+
+def _apply_nms(boxes, scores, threshold=0.5):
   """After this only positive boxes are left
   Applying this class-wise
   """
@@ -184,6 +190,7 @@ def _apply_nms(boxes, scores, threshold = 0.5):
   final_scores = np.vstack(final_scores)
   
   return final_boxes, final_scores
+
 
 if __name__ == '__main__':
   import time

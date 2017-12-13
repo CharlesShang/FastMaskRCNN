@@ -6,16 +6,20 @@
 # --------------------------------------------------------
 
 import numpy as np
-import libs.configs.config_v1 as cfg
-import libs.nms.gpu_nms as gpu_nms
-import libs.nms.cpu_nms as cpu_nms
+# import libs.configs.config_v1 as cfg
+try:
+    from libs.nms.gpu_nms import gpu_nms as lib_nms
+except:
+    from libs.nms.cpu_nms import cpu_nms as lib_nms
+
 
 def nms(dets, thresh, force_cpu=False):
     """Dispatch to either CPU or GPU NMS implementations."""
 
     if dets.shape[0] == 0:
         return []
-    return gpu_nms.gpu_nms(dets, thresh, device_id=0)
+    return lib_nms(dets, thresh, device_id=0)
+
 
 def nms_wrapper(scores, boxes, threshold = 0.7, class_sets = None):
     """
@@ -46,6 +50,7 @@ def nms_wrapper(scores, boxes, threshold = 0.7, class_sets = None):
             r['class'], r['dets'] = cls, None
         res.append(r)
     return res
+
 
 if __name__=='__main__':
   

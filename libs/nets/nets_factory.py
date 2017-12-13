@@ -7,12 +7,12 @@ import tensorflow as tf
 
 from . import resnet_v1
 from .resnet_v1 import resnet_v1_50 as resnet50
-from .resnet_utils import resnet_arg_scope
-from .resnet_v1 import resnet_v1_101 as resnet101
+# from .resnet_utils import resnet_arg_scope
+# from .resnet_v1 import resnet_v1_101 as resnet101
 
 slim = tf.contrib.slim
 
-pyramid_maps = {
+PYRAMID_MAPS = {
   'resnet50': {'C1':'resnet_v1_50/conv1/Relu:0',
                'C2':'resnet_v1_50/block1/unit_2/bottleneck_v1',
                'C3':'resnet_v1_50/block2/unit_3/bottleneck_v1',
@@ -24,6 +24,7 @@ pyramid_maps = {
                 'C5': '',
                }
 }
+
 
 def get_network(name, image, weight_decay=0.000005, is_training=False):
 
@@ -39,4 +40,4 @@ def get_network(name, image, weight_decay=0.000005, is_training=False):
         name
 
     end_points['input'] = image
-    return logits, end_points, pyramid_maps[name]
+    return logits, end_points, PYRAMID_MAPS[name]

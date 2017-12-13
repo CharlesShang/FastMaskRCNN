@@ -11,6 +11,7 @@ import numpy as np
 import cv2
 from ..fast_rcnn.config import cfg
 
+
 def im_list_to_blob(ims):
     """Convert a list of images into a network input.
 
@@ -25,6 +26,7 @@ def im_list_to_blob(ims):
         blob[i, 0:im.shape[0], 0:im.shape[1], :] = im
 
     return blob
+
 
 def prep_im_for_blob(im, pixel_means, target_size, max_size):
     """Mean subtract and scale an image for use in a blob."""

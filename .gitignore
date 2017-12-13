@@ -30,6 +30,12 @@ var/
 *.manifest
 *.spec
 
+# PyCharm
+.idea
+
+# Dropbox sync
+.dropbox.attr
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -42,9 +48,8 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
-*,cover
+*.cover
 .hypothesis/
-.idea
 
 # Translations
 *.mo

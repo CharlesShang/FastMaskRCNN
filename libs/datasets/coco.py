@@ -90,6 +90,7 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
     items_to_descriptions=_ITEMS_TO_DESCRIPTIONS,
     num_classes=_NUM_CLASSES)
 
+
 def read(tfrecords_filename):
 
   if not isinstance(tfrecords_filename, list):
@@ -130,4 +131,3 @@ def read(tfrecords_filename):
   gt_masks = tf.reshape(gt_masks, [num_instances, ih, iw])
   
   return image, ih, iw, gt_boxes, gt_masks, num_instances, img_id
-

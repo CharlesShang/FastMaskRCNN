@@ -6,14 +6,15 @@ from __future__ import print_function
 
 import numpy as np
 
-import libs.boxes.cython_bbox as cython_bbox
-import libs.configs.config_v1 as cfg
-from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
-from libs.boxes.anchor import anchors_plane
-from libs.logs.log import LOG
+# import libs.boxes.cython_bbox as cython_bbox
+# import libs.configs.config_v1 as cfg
+# from libs.boxes.bbox_transform import bbox_transform, bbox_transform_inv, clip_boxes
+# from libs.boxes.anchor import anchors_plane
+# from libs.logs.log import LOG
 # FLAGS = tf.app.flags.FLAGS
 
 _DEBUG = False
+
 
 def assign_boxes(gt_boxes, min_k=2, max_k=5):
     """assigning boxes to layers in a pyramid according to its area

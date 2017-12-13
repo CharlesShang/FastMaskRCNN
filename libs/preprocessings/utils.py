@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from __future__ import division
-from __future__ import print_function
+# from __future__ import print_function
 
 import tensorflow as tf
 
@@ -131,6 +131,7 @@ def _smallest_size_at_least(height, width, smallest_side):
   new_width = tf.to_int32(width * scale)
   return new_height, new_width
 
+
 def _aspect_preserving_resize(image, label, smallest_side):
   smallest_side = tf.convert_to_tensor(smallest_side, dtype=tf.int32)
 
@@ -152,6 +153,7 @@ def _aspect_preserving_resize(image, label, smallest_side):
   resized_label.set_shape([None, None, 1])
   return resized_image, resized_label
 
+
 def flip_gt_boxes(gt_boxes, ih, iw):
     x1s, y1s, x2s, y2s, cls = \
             gt_boxes[:, 0], gt_boxes[:, 1], gt_boxes[:, 2], gt_boxes[:, 3], gt_boxes[:, 4]
@@ -166,8 +168,10 @@ def flip_gt_boxes(gt_boxes, ih, iw):
 def flip_gt_masks(gt_masks):
     return tf.reverse(gt_masks, axis=[2])
 
+
 def flip_image(image):
     return tf.reverse(image, axis=[1])
+
 
 def resize_gt_boxes(gt_boxes, scale_ratio):
     xys, cls = \

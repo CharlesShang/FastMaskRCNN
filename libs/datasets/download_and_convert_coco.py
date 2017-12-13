@@ -6,12 +6,12 @@ import os
 import sys
 import math
 import zipfile
-import time
+# import time
 import numpy as np
 import tensorflow as tf
 from six.moves import urllib
 from PIL import Image
-import skimage.io as io
+# import skimage.io as io
 from matplotlib import pyplot as plt
 
 from libs.datasets.pycocotools.coco import COCO
@@ -64,26 +64,28 @@ def download_and_uncompress_zip(zip_url, dataset_dir):
     f.extractall(dataset_dir)
     print('Successfully extracted')
 
+
 def _real_id_to_cat_id(catId):
   """Note coco has 80 classes, but the catId ranges from 1 to 90!"""
-  real_id_to_cat_id = \
-    {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 13, 13: 14, 14: 15, 15: 16, 16: 17,
-     17: 18, 18: 19, 19: 20, 20: 21, 21: 22, 22: 23, 23: 24, 24: 25, 25: 27, 26: 28, 27: 31, 28: 32, 29: 33, 30: 34,
-     31: 35, 32: 36, 33: 37, 34: 38, 35: 39, 36: 40, 37: 41, 38: 42, 39: 43, 40: 44, 41: 46, 42: 47, 43: 48, 44: 49,
-     45: 50, 46: 51, 47: 52, 48: 53, 49: 54, 50: 55, 51: 56, 52: 57, 53: 58, 54: 59, 55: 60, 56: 61, 57: 62, 58: 63,
-     59: 64, 60: 65, 61: 67, 62: 70, 63: 72, 64: 73, 65: 74, 66: 75, 67: 76, 68: 77, 69: 78, 70: 79, 71: 80, 72: 81,
-     73: 82, 74: 84, 75: 85, 76: 86, 77: 87, 78: 88, 79: 89, 80: 90}
+  real_id_to_cat_id = dict(zip(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+       21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
+       39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
+       57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+       75, 76, 77, 78, 79, 80],
+      range(1, 81)))
   return real_id_to_cat_id[catId]
+
 
 def _cat_id_to_real_id(readId):
   """Note coco has 80 classes, but the catId ranges from 1 to 90!"""
-  cat_id_to_real_id = \
-    {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 13: 12, 14: 13, 15: 14, 16: 15, 17: 16,
-     18: 17, 19: 18, 20: 19, 21: 20, 22: 21, 23: 22, 24: 23, 25: 24, 27: 25, 28: 26, 31: 27, 32: 28, 33: 29, 34: 30,
-     35: 31, 36: 32, 37: 33, 38: 34, 39: 35, 40: 36, 41: 37, 42: 38, 43: 39, 44: 40, 46: 41, 47: 42, 48: 43, 49: 44,
-     50: 45, 51: 46, 52: 47, 53: 48, 54: 49, 55: 50, 56: 51, 57: 52, 58: 53, 59: 54, 60: 55, 61: 56, 62: 57, 63: 58,
-     64: 59, 65: 60, 67: 61, 70: 62, 72: 63, 73: 64, 74: 65, 75: 66, 76: 67, 77: 68, 78: 69, 79: 70, 80: 71, 81: 72,
-     82: 73, 84: 74, 85: 75, 86: 76, 87: 77, 88: 78, 89: 79, 90: 80}
+  cat_id_to_real_id = dict(zip(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+       22, 23, 24, 25, 27, 28, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
+       43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
+       62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84,
+       85, 86, 87, 88, 89, 90],
+      range(1, 81)))
   return cat_id_to_real_id[readId]
   
 
@@ -131,6 +133,7 @@ def _int64_feature(values):
     values = [values]
   return tf.train.Feature(int64_list=tf.train.Int64List(value=values))
 
+
 def _bytes_feature(values):
   return tf.train.Feature(bytes_list=tf.train.BytesList(value=[values]))
 
@@ -147,6 +150,7 @@ def _to_tfexample(image_data, image_format, label_data, label_format, height, wi
       'label/height': _int64_feature(height),
       'label/width': _int64_feature(width),
   }))
+
 
 def _to_tfexample_coco(image_data, image_format, label_data, label_format,
                        height, width,
@@ -230,7 +234,6 @@ def _get_coco_masks(coco, img_id, height, width, img_name):
   
   return gt_boxes, masks, mask
   
-
 
 def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
   """Loads image files and writes files to a TFRecord.
@@ -317,6 +320,7 @@ def _add_to_tfrecord(record_dir, image_dir, annotation_dir, split_name):
   sys.stdout.write('\n')
   sys.stdout.flush()
 
+
 def _add_to_tfrecord_trainvalsplit(record_dir, image_dir, annotation_dir, split_name):
   """Loads image files and writes files to a TFRecord.
   Note: masks and bboxes will lose shape info after converting to string.
@@ -392,10 +396,12 @@ def _add_to_tfrecord_trainvalsplit(record_dir, image_dir, annotation_dir, split_
                 shard_id += 1
                 record_filename = _get_dataset_filename(record_dir, split_name, shard_id, num_shards)
                 options = tf.python_io.TFRecordOptions(TFRecordCompressionType.ZLIB)
-                tfrecord_writer = tf.python_io.TFRecordWriter(record_filename, options=options) 
+                tfrecord_writer = tf.python_io.TFRecordWriter(record_filename,
+                                                              options=options)
 
             if cnt % 100 == 1:
-                print ('%d (image_id: %d) of %d, split: %s, shard_id: %d' %(i, img_id, len(imgs), split_name, shard_id))
+                print ('%d (image_id: %d) of %d, split: %s, shard_id: %d'
+                       % (i, img_id, len(imgs), split_name, shard_id))
 
             
             # process anns
