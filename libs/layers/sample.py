@@ -114,14 +114,14 @@ def sample_rpn_outputs_wrt_gt_boxes(boxes, scores, gt_boxes, is_training=False, 
             gt_argmax_overlaps = overlaps.argmax(axis=0) # G
             fg_inds = np.union1d(gt_argmax_overlaps, fg_inds)
 
-	fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
-      	if fg_inds.size > 0 and fg_rois < fg_inds.size:
-       	   fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
+        fg_rois = int(min(fg_inds.size, cfg.FLAGS.rois_per_image * cfg.FLAGS.fg_roi_fraction))
+        if fg_inds.size > 0 and fg_rois < fg_inds.size:
+            fg_inds = np.random.choice(fg_inds, size=fg_rois, replace=False)
       	
-	# TODO: sampling strategy
+        # TODO: sampling strategy
       	bg_inds = np.where((max_overlaps < cfg.FLAGS.bg_threshold))[0]
-      	bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8)#64
-      	if bg_inds.size > 0 and bg_rois < bg_inds.size:
+        bg_rois = max(min(cfg.FLAGS.rois_per_image - fg_rois, fg_rois * 3), 8)#64
+        if bg_inds.size > 0 and bg_rois < bg_inds.size:
            bg_inds = np.random.choice(bg_inds, size=bg_rois, replace=False)
 
         keep_inds = np.append(fg_inds, bg_inds)
