@@ -88,7 +88,7 @@ void _set_device(int device_id) {
   CUDA_CHECK(cudaSetDevice(device_id));
 }
 
-void _nms(int* keep_out, int* num_out, const float* boxes_host, int boxes_num,
+void _nms(long* keep_out, int* num_out, const float* boxes_host, int boxes_num,
           int boxes_dim, float nms_overlap_thresh, int device_id) {
   _set_device(device_id);
 
