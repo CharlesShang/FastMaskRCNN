@@ -34,6 +34,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_boolean('vis',  False,
                           'Show some visual masks')
 
+
 def download_and_uncompress_zip(zip_url, dataset_dir):
   """Downloads the `zip_url` and uncompresses it locally.
      From: https://github.com/tensorflow/models/blob/master/slim/datasets/dataset_utils.py

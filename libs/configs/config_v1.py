@@ -235,7 +235,7 @@ tf.app.flags.DEFINE_float(
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(
-    'fg_threshold', 0.5,
+    'fg_threshold', 0.7,
     'Only regions which intersection is larger than fg_threshold are considered to be fg')
 
 tf.app.flags.DEFINE_float(

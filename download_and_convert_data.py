@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import tensorflow as tf
 
 from libs.datasets import download_and_convert_coco
@@ -21,6 +22,8 @@ FLAGS = tf.app.flags.FLAGS
 
 
 def main(_):
+  if not os.path.isdir('./output/mask_rcnn'):
+    os.makedirs('./output/mask_rcnn')
   if not FLAGS.dataset_name:
     raise ValueError('You must supply the dataset name with --dataset_name')
   if not FLAGS.dataset_dir:
