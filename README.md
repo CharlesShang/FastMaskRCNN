@@ -10,6 +10,7 @@ This repo attempts to reproduce this amazing work by Kaiming He et al. :
 - [Numpy](https://github.com/numpy/numpy/blob/master/INSTALL.rst.txt)
 - [COCO dataset](http://mscoco.org/dataset/#download)
 - [Resnet50](http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz)
+- [Cython](https://cython.org/)
 
 ## How-to
 1. Go to `./libs/datasets/pycocotools` and run `make`
